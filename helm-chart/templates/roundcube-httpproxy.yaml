@@ -1,0 +1,53 @@
+{{- if .Values.roundcube.enabled }}
+# =============================================================================
+# Roundcube Webmail — HTTPProxy for Contour/Envoy web access
+# =============================================================================
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-roundcube
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: roundcube
+    app.kubernetes.io/component: webmail
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  virtualhost:
+    fqdn: webmail.{{ .Values.global.hostname }}
+    {{- if .Values.certManager.enabled }}
+    tls:
+      secretName: {{ include "hosting-panel.fullname" . }}-roundcube-tls
+    {{- end }}
+  routes:
+    - conditions:
+        - prefix: /
+      services:
+        - name: {{ include "hosting-panel.fullname" . }}-roundcube
+          port: 80
+      timeoutPolicy:
+        response: 60s
+        idle: 300s
+{{- if .Values.certManager.enabled }}
+---
+# =============================================================================
+# Roundcube Webmail — TLS Certificate via cert-manager
+# =============================================================================
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-roundcube-tls
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: roundcube
+spec:
+  secretName: {{ include "hosting-panel.fullname" . }}-roundcube-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - webmail.{{ .Values.global.hostname }}
+{{- end }}
+{{- end }}

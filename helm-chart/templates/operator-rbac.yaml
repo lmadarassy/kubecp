@@ -1,0 +1,75 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-operator
+  labels:
+    {{- include "hosting-panel.operatorLabels" . | nindent 4 }}
+rules:
+  # CRD resources — watch and update status
+  - apiGroups: ["hosting.hosting.panel"]
+    resources: ["websites", "databases", "emailaccounts", "emaildomains", "sftpaccounts"]
+    verbs: ["get", "list", "watch", "update", "patch", "create", "delete"]
+  - apiGroups: ["hosting.hosting.panel"]
+    resources: ["websites/status", "databases/status", "emailaccounts/status", "emaildomains/status", "sftpaccounts/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["hosting.hosting.panel"]
+    resources: ["websites/finalizers", "databases/finalizers", "emailaccounts/finalizers", "emaildomains/finalizers", "sftpaccounts/finalizers"]
+    verbs: ["update"]
+  # HostingPlan — read-only for quota checks
+  - apiGroups: ["hosting.hosting.panel"]
+    resources: ["hostingplans"]
+    verbs: ["get", "list", "watch"]
+  # Deployments and Services in hosting namespaces
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # PVCs
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # PVs — read for cross-namespace PVC binding (SFTP volume sharing)
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  # Ingress (nginx)
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # HTTPProxy (Contour)
+  - apiGroups: ["projectcontour.io"]
+    resources: ["httpproxies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Certificates (cert-manager)
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Secrets — for TLS secrets and DB credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Namespaces — read for namespace validation
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-operator
+  labels:
+    {{- include "hosting-panel.operatorLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "hosting-panel.fullname" . }}-operator
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "hosting-panel.fullname" . }}-operator
+    namespace: {{ include "hosting-panel.namespace" . }}

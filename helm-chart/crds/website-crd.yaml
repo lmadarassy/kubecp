@@ -1,0 +1,182 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: websites.hosting.hosting.panel
+spec:
+  group: hosting.hosting.panel
+  names:
+    kind: Website
+    listKind: WebsiteList
+    plural: websites
+    singular: website
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.primaryDomain
+      name: Domain
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.owner
+      name: Owner
+      type: string
+    - jsonPath: .spec.php.version
+      name: PHP
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Website is the Schema for the websites API.
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: WebsiteSpec defines the desired state of Website.
+            properties:
+              primaryDomain:
+                description: Main domain for this website.
+                minLength: 1
+                type: string
+              aliases:
+                description: Additional domain aliases pointing to this website.
+                items:
+                  type: string
+                type: array
+              ssl:
+                description: TLS configuration for the primary domain.
+                properties:
+                  enabled:
+                    default: true
+                    type: boolean
+                  mode:
+                    default: letsencrypt
+                    enum: ["letsencrypt", "selfsigned", "custom", "none"]
+                    type: string
+                  issuer:
+                    default: letsencrypt-production
+                    type: string
+                  secretName:
+                    type: string
+                required:
+                - enabled
+                type: object
+              php:
+                properties:
+                  version:
+                    default: "8.2"
+                    enum: ["7.4", "8.0", "8.1", "8.2", "8.3", "8.4", "8.5"]
+                    type: string
+                required:
+                - version
+                type: object
+              phpConfigProfile:
+                default: "default"
+                description: Name of the PHP_Config_Profile ConfigMap to mount.
+                type: string
+              owner:
+                description: Username who owns this website.
+                minLength: 1
+                type: string
+              replicas:
+                default: 1
+                format: int32
+                minimum: 1
+                type: integer
+              resources:
+                properties:
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      x-kubernetes-int-or-string: true
+                    type: object
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      x-kubernetes-int-or-string: true
+                    type: object
+                type: object
+              storageSize:
+                default: 5Gi
+                type: string
+              ownerUID:
+                description: Linux UID for the website owner (matches SFTP upload UID).
+                format: int32
+                minimum: 1000
+                type: integer
+            required:
+            - primaryDomain
+            - owner
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      maxLength: 1024
+                      minLength: 1
+                      type: string
+                    status:
+                      enum: ["True", "False", "Unknown"]
+                      type: string
+                    type:
+                      maxLength: 316
+                      type: string
+                  required: [lastTransitionTime, message, reason, status, type]
+                  type: object
+                type: array
+              domains:
+                items:
+                  properties:
+                    certificateExpiry:
+                      format: date-time
+                      type: string
+                    certificateStatus:
+                      enum: [Pending, Valid, Expiring, Expired, Error]
+                      type: string
+                    name:
+                      type: string
+                  required: [name]
+                  type: object
+                type: array
+              phase:
+                enum: [Pending, Provisioning, Running, Suspended, Error, Terminating]
+                type: string
+              readyReplicas:
+                format: int32
+                type: integer
+              replicas:
+                format: int32
+                type: integer
+            type: object
+        required: [spec]
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

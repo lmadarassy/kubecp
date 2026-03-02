@@ -1,0 +1,114 @@
+{{- if .Values.mail.smtp.enabled }}
+# =============================================================================
+# Postfix — Configuration ConfigMap (Helm template → ConfigMap)
+# Centralized config generation — referenced by mail-smtp-deployment.yaml
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-postfix-config
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-smtp
+    app.kubernetes.io/component: mail
+data:
+  main.cf: |
+    # Basic settings
+    {{- $hostname := .Values.global.hostname }}
+    {{- /* postfix mydomain cannot be an IP address — use a valid FQDN */}}
+    {{- if regexMatch "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+$" $hostname }}
+    myhostname = mail.hosting.local
+    mydomain = hosting.local
+    {{- else }}
+    myhostname = mail.{{ $hostname }}
+    mydomain = {{ $hostname }}
+    {{- end }}
+    myorigin = $mydomain
+    mydestination = localhost
+    mynetworks = 127.0.0.0/8 [::1]/128 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+
+    # Virtual mailbox configuration
+    # Domains and mailboxes are managed via hash maps (updated by operator on account creation)
+    virtual_mailbox_domains = hash:/etc/postfix/virtual_domains
+    virtual_mailbox_maps = hash:/etc/postfix/virtual_mailbox
+    virtual_alias_maps = hash:/etc/postfix/virtual_alias
+
+    # Deliver mail via LMTP to Dovecot (Dovecot manages maildir storage)
+    virtual_transport = lmtp:inet:{{ include "hosting-panel.fullname" . }}-mail-imap:24
+
+    # SMTP AUTH via SASL (Dovecot as auth backend)
+    smtpd_sasl_type = dovecot
+    smtpd_sasl_path = inet:{{ include "hosting-panel.fullname" . }}-mail-imap:12345
+    smtpd_sasl_auth_enable = yes
+    smtpd_sasl_security_options = noanonymous
+    smtpd_sasl_local_domain = $myhostname
+
+    # TLS settings
+    smtpd_tls_security_level = may
+    smtpd_tls_auth_only = yes
+    smtp_tls_security_level = may
+
+    # Rspamd milter integration
+    {{- if .Values.rspamd.enabled }}
+    smtpd_milters = inet:{{ include "hosting-panel.fullname" . }}-rspamd:{{ .Values.rspamd.service.milterPort }}
+    non_smtpd_milters = inet:{{ include "hosting-panel.fullname" . }}-rspamd:{{ .Values.rspamd.service.milterPort }}
+    milter_protocol = 6
+    milter_mail_macros = i {mail_addr} {client_addr} {client_name} {auth_authen}
+    milter_default_action = accept
+    {{- end }}
+
+    # Restrictions
+    smtpd_recipient_restrictions =
+      permit_sasl_authenticated,
+      permit_mynetworks,
+      reject_unauth_destination
+
+    smtpd_relay_restrictions =
+      permit_sasl_authenticated,
+      permit_mynetworks,
+      reject_unauth_destination
+
+    # Message size limit (25MB)
+    message_size_limit = 26214400
+    mailbox_size_limit = 0
+    smtpd_helo_required = yes
+
+  master.cf: |
+    # Postfix master process configuration
+    smtp      inet  n       -       n       -       -       smtpd
+    submission inet n       -       n       -       -       smtpd
+      -o syslog_name=postfix/submission
+      -o smtpd_tls_security_level=encrypt
+      -o smtpd_sasl_auth_enable=yes
+      -o smtpd_reject_unlisted_recipient=no
+      -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+      -o milter_macro_daemon_name=ORIGINATING
+    pickup    unix  n       -       n       60      1       pickup
+    cleanup   unix  n       -       n       -       0       cleanup
+    qmgr      unix  n       -       n       300     1       qmgr
+    tlsmgr    unix  -       -       n       1000?   1       tlsmgr
+    rewrite   unix  -       -       n       -       -       trivial-rewrite
+    bounce    unix  -       -       n       -       0       bounce
+    defer     unix  -       -       n       -       0       bounce
+    trace     unix  -       -       n       -       0       bounce
+    verify    unix  -       -       n       -       1       verify
+    flush     unix  n       -       n       1000?   0       flush
+    proxymap  unix  -       -       n       -       -       proxymap
+    proxywrite unix -       -       n       -       1       proxymap
+    smtp      unix  -       -       n       -       -       smtp
+    relay     unix  -       -       n       -       -       smtp
+    error     unix  -       -       n       -       -       error
+    retry     unix  -       -       n       -       -       error
+    discard   unix  -       -       n       -       -       discard
+    local     unix  -       n       n       -       -       local
+    virtual   unix  -       n       n       -       -       virtual
+    lmtp      unix  -       -       n       -       -       lmtp
+    anvil     unix  -       -       n       -       1       anvil
+    scache    unix  -       -       n       -       1       scache
+
+  # Initial empty hash maps — operator updates these via postmap when accounts are created
+  virtual_domains: ""
+  virtual_mailbox: ""
+  virtual_alias: ""
+{{- end }}

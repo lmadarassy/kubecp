@@ -1,0 +1,83 @@
+{{- if .Values.sftp.enabled }}
+# =============================================================================
+# SFTP — OpenSSH with pam-keycloak-oidc for Keycloak authentication
+# Auth flow: SFTP login → sshd → PAM → pam-keycloak-oidc → Keycloak ROPC → OK/FAIL
+# Image: hosting-panel-sftp (Debian bookworm-slim + OpenSSH + pam-keycloak-oidc)
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-sftp
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sftp
+spec:
+  replicas: {{ .Values.sftp.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sftp
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sftp
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-creds
+      containers:
+        - name: sftp
+          image: "{{ .Values.sftp.image.repository }}:{{ .Values.sftp.image.tag }}"
+          imagePullPolicy: {{ .Values.sftp.image.pullPolicy }}
+          ports:
+            - name: sftp
+              containerPort: 2022
+              protocol: TCP
+          env:
+            - name: KEYCLOAK_URL
+              value: {{ include "hosting-panel.keycloakUrl" . | quote }}
+            - name: KEYCLOAK_REALM
+              value: {{ .Values.keycloak.realm.name | quote }}
+            - name: KEYCLOAK_CLIENT_ID
+              value: "sftp-client"
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting-panel.fullname" . }}-sftp-client
+                  key: secret
+          resources:
+            {{- toYaml .Values.sftp.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: sftp
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: sftp
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Volume mounts are managed dynamically by the hosting-operator
+          # via SyncSFTPVolumes — it mounts per-user PVCs (uv-{owner})
+          # under /home/{username} based on Website CRD owners.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-sftp
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sftp
+spec:
+  type: {{ .Values.sftp.service.type }}
+  ports:
+    - name: sftp
+      port: {{ .Values.sftp.service.port }}
+      targetPort: sftp
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: sftp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

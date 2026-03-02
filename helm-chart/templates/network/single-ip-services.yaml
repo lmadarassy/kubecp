@@ -1,0 +1,144 @@
+{{/*
+  Single-IP mode: All external services use hostNetwork or NodePort.
+  Contour/Envoy handles HTTP/HTTPS on ports 80/443 via hostNetwork.
+  Mail, DNS, SFTP use NodePort services.
+*/}}
+{{- if eq .Values.global.networkMode "single-ip" }}
+---
+# =============================================================================
+# Single-IP Mode — SFTP NodePort Service
+# =============================================================================
+{{- if .Values.sftp.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-sftp-nodeport
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: sftp
+  annotations:
+    hosting.panel/network-mode: "single-ip"
+spec:
+  type: NodePort
+  ports:
+    - name: sftp
+      port: {{ .Values.sftp.service.port }}
+      targetPort: sftp
+      nodePort: 30022
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: sftp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+# =============================================================================
+# Single-IP Mode — Mail SMTP NodePort Service
+# =============================================================================
+{{- if .Values.mail.smtp.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-mail-smtp-nodeport
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-smtp
+  annotations:
+    hosting.panel/network-mode: "single-ip"
+spec:
+  type: NodePort
+  ports:
+    - name: smtp
+      port: {{ .Values.mail.smtp.service.port }}
+      targetPort: smtp
+      nodePort: 30025
+      protocol: TCP
+    - name: submission
+      port: {{ .Values.mail.smtp.service.submissionPort }}
+      targetPort: submission
+      nodePort: 30587
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mail-smtp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+# =============================================================================
+# Single-IP Mode — Mail IMAP NodePort Service
+# =============================================================================
+{{- if .Values.mail.imap.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-mail-imap-nodeport
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-imap
+  annotations:
+    hosting.panel/network-mode: "single-ip"
+spec:
+  type: NodePort
+  ports:
+    - name: imap
+      port: {{ .Values.mail.imap.service.imapPort }}
+      targetPort: imap
+      nodePort: 30143
+      protocol: TCP
+    - name: imaps
+      port: {{ .Values.mail.imap.service.imapsPort }}
+      targetPort: imaps
+      nodePort: 30993
+      protocol: TCP
+    - name: pop3
+      port: {{ .Values.mail.imap.service.pop3Port }}
+      targetPort: pop3
+      nodePort: 30110
+      protocol: TCP
+    - name: pop3s
+      port: {{ .Values.mail.imap.service.pop3sPort }}
+      targetPort: pop3s
+      nodePort: 30995
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mail-imap
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+# =============================================================================
+# Single-IP Mode — PowerDNS NodePort Service
+# =============================================================================
+{{- if .Values.powerdns.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-powerdns-nodeport
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: powerdns
+  annotations:
+    hosting.panel/network-mode: "single-ip"
+spec:
+  type: NodePort
+  ports:
+    - name: dns-tcp
+      port: {{ .Values.powerdns.service.dnsPort }}
+      targetPort: dns-tcp
+      nodePort: 30053
+      protocol: TCP
+    - name: dns-udp
+      port: {{ .Values.powerdns.service.dnsPort }}
+      targetPort: dns-udp
+      nodePort: 30053
+      protocol: UDP
+    - name: api
+      port: {{ .Values.powerdns.service.apiPort }}
+      targetPort: api
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: powerdns
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,101 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.grafana.enabled }}
+# =============================================================================
+# Grafana Dashboard ConfigMaps — auto-discovered by Grafana sidecar
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-grafana-cluster-overview
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  hosting-cluster-overview.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 0,
+      "id": null,
+      "links": [],
+      "panels": [
+        {
+          "title": "Total Websites",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "targets": [{ "expr": "count(kube_customresource_websites)", "legendFormat": "Websites" }]
+        },
+        {
+          "title": "Total Databases",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "targets": [{ "expr": "count(kube_customresource_databases)", "legendFormat": "Databases" }]
+        },
+        {
+          "title": "Total Email Accounts",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "targets": [{ "expr": "count(kube_customresource_emailaccounts)", "legendFormat": "Email Accounts" }]
+        },
+        {
+          "title": "Node CPU Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "targets": [{ "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)", "legendFormat": "{{ "{{instance}}" }}" }]
+        },
+        {
+          "title": "Node Memory Usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "targets": [{ "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{ "{{instance}}" }}" }]
+        },
+        {
+          "title": "Pod Status",
+          "type": "table",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+          "targets": [{ "expr": "kube_pod_status_phase{namespace=\"hosting-system\"}", "legendFormat": "{{ "{{pod}}" }} - {{ "{{phase}}" }}" }]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["hosting-panel"],
+      "templating": { "list": [] },
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "Hosting Panel — Cluster Overview",
+      "uid": "hosting-cluster-overview"
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-grafana-per-user
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  hosting-per-user.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "panels": [
+        {
+          "title": "Websites per User",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [{ "expr": "count by(user) (kube_customresource_websites{label_hosting_panel_user!=\"\"})", "legendFormat": "{{ "{{user}}" }}" }]
+        },
+        {
+          "title": "Storage Usage per User",
+          "type": "bargauge",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [{ "expr": "kubelet_volume_stats_used_bytes{persistentvolumeclaim=~\"uv-.*\"}", "legendFormat": "{{ "{{persistentvolumeclaim}}" }}" }]
+        }
+      ],
+      "schemaVersion": 39,
+      "tags": ["hosting-panel", "per-user"],
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "Hosting Panel — Per User",
+      "uid": "hosting-per-user"
+    }
+{{- end }}

@@ -1,0 +1,16 @@
+{{- if .Values.metallb.enabled }}
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: {{ .Values.metallb.ipAddressPool.name }}
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: metallb
+    app.kubernetes.io/component: config
+spec:
+  addresses:
+    {{- range .Values.metallb.ipAddressPool.addresses }}
+    - {{ . | quote }}
+    {{- end }}
+{{- end }}

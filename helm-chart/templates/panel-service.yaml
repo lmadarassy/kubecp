@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-panel
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.panelLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.panel.service.type }}
+  ports:
+    - name: http-api
+      port: {{ .Values.panel.service.port }}
+      targetPort: http
+      protocol: TCP
+    - name: http-ui
+      port: 80
+      targetPort: ui
+      protocol: TCP
+    {{- if .Values.panel.metrics.enabled }}
+    - name: metrics
+      port: {{ .Values.panel.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "hosting-panel.panelSelectorLabels" . | nindent 4 }}

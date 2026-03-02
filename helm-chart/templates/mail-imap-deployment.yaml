@@ -1,0 +1,181 @@
+{{- if .Values.mail.imap.enabled }}
+# =============================================================================
+# Dovecot IMAP/POP3 — Deployment with Keycloak checkpassword auth
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-mail-imap
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-imap
+    app.kubernetes.io/component: mail
+spec:
+  replicas: {{ .Values.mail.imap.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mail-imap
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mail-imap
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/config: {{ include "hosting-panel.fullname" . }}-dovecot-config
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-creds
+      initContainers:
+        - name: fix-maildir-perms
+          image: busybox:1.36
+          command: ["sh", "-c", "chown -R 5000:5000 /var/mail/vhosts; chmod 755 /var/mail/vhosts"]
+          volumeMounts:
+            - name: mail-data
+              mountPath: /var/mail/vhosts
+        - name: install-curl
+          image: "{{ .Values.mail.imap.image.repository }}:{{ .Values.mail.imap.image.tag }}"
+          command:
+            - sh
+            - -c
+            - |
+              apt-get update -qq && apt-get install -y -qq curl >/dev/null 2>&1
+              # Copy curl binary and all its library dependencies to shared volume
+              cp /usr/bin/curl /shared/
+              ldd /usr/bin/curl | grep -o '/[^ ]*' | while read lib; do
+                cp -n "$lib" /shared/ 2>/dev/null || true
+              done
+          volumeMounts:
+            - name: shared-bin
+              mountPath: /shared
+      containers:
+        - name: dovecot
+          image: "{{ .Values.mail.imap.image.repository }}:{{ .Values.mail.imap.image.tag }}"
+          imagePullPolicy: {{ .Values.mail.imap.image.pullPolicy }}
+          ports:
+            - name: imap
+              containerPort: 143
+              protocol: TCP
+            - name: imaps
+              containerPort: 993
+              protocol: TCP
+            - name: pop3
+              containerPort: 110
+              protocol: TCP
+            - name: pop3s
+              containerPort: 995
+              protocol: TCP
+            - name: auth
+              containerPort: 12345
+              protocol: TCP
+            - name: lmtp
+              containerPort: 24
+              protocol: TCP
+          env:
+            - name: KC_TOKEN_URL
+              value: "{{ include "hosting-panel.keycloakUrl" . }}/realms/{{ .Values.keycloak.realm.name }}/protocol/openid-connect/token"
+            - name: KC_CLIENT_ID
+              value: "mail-client"
+            - name: KC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting-panel.fullname" . }}-mail-client
+                  key: secret
+          resources:
+            {{- toYaml .Values.mail.imap.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: imap
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: imap
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: mail-data
+              mountPath: /var/mail/vhosts
+            - name: dovecot-config
+              mountPath: /etc/dovecot/dovecot.conf
+              subPath: dovecot.conf
+              readOnly: true
+            - name: checkpassword
+              mountPath: /usr/local/bin/kc-checkpassword
+              subPath: kc-checkpassword
+              readOnly: true
+            - name: shared-bin
+              mountPath: /opt/curl-libs
+              readOnly: true
+      volumes:
+        - name: mail-data
+          persistentVolumeClaim:
+            claimName: {{ include "hosting-panel.fullname" . }}-mail-data
+        - name: dovecot-config
+          configMap:
+            name: {{ include "hosting-panel.fullname" . }}-dovecot-config
+            defaultMode: 0644
+        - name: checkpassword
+          configMap:
+            name: {{ include "hosting-panel.fullname" . }}-dovecot-checkpassword
+            defaultMode: 0755
+        - name: shared-bin
+          emptyDir: {}
+---
+# =============================================================================
+# mail-client Secret for Dovecot → Keycloak auth
+# =============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-mail-client
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  secret: {{ .Values.mail.keycloak.clientSecret | default "mail-client-secret-123" | quote }}
+---
+# =============================================================================
+# Dovecot IMAP/POP3 — Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-mail-imap
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-imap
+spec:
+  type: ClusterIP
+  ports:
+    - name: imap
+      port: {{ .Values.mail.imap.service.imapPort }}
+      targetPort: imap
+      protocol: TCP
+    - name: imaps
+      port: {{ .Values.mail.imap.service.imapsPort }}
+      targetPort: imaps
+      protocol: TCP
+    - name: pop3
+      port: {{ .Values.mail.imap.service.pop3Port }}
+      targetPort: pop3
+      protocol: TCP
+    - name: pop3s
+      port: {{ .Values.mail.imap.service.pop3sPort }}
+      targetPort: pop3s
+      protocol: TCP
+    - name: lmtp
+      port: 24
+      targetPort: lmtp
+      protocol: TCP
+    - name: auth
+      port: 12345
+      targetPort: auth
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mail-imap
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

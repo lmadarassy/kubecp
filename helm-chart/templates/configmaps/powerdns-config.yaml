@@ -1,0 +1,39 @@
+{{- if .Values.powerdns.enabled }}
+# =============================================================================
+# PowerDNS — Configuration ConfigMap (Helm template → ConfigMap)
+# Centralized config generation — referenced by powerdns-statefulset.yaml
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-powerdns-config
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: powerdns
+data:
+  pdns.conf: |
+    setuid=pdns
+    setgid=pdns
+    {{- if eq .Values.powerdns.backend "gmysql" }}
+    launch=gmysql
+    gmysql-host={{ include "hosting-panel.galeraHost" . }}
+    gmysql-port=3306
+    gmysql-dbname=powerdns
+    gmysql-user=powerdns
+    {{- else }}
+    launch=gsqlite3
+    gsqlite3-database=/data/pdns.sqlite3
+    {{- end }}
+    api=yes
+    api-key={{ .Values.powerdns.api.key }}
+    webserver=yes
+    webserver-address=0.0.0.0
+    webserver-port={{ .Values.powerdns.api.port }}
+    webserver-allow-from=0.0.0.0/0,::/0
+    local-address=0.0.0.0
+    local-port=53
+    daemon=no
+    guardian=no
+    loglevel=4
+{{- end }}

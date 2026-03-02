@@ -1,0 +1,54 @@
+apiVersion: v2
+name: hosting-panel
+description: Kubernetes-native web hosting control panel — manages websites, databases, email, SFTP, DNS, and TLS certificates on k3s clusters.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.25.0"
+keywords:
+  - hosting
+  - webhosting
+  - kubernetes
+  - k3s
+  - control-panel
+maintainers:
+  - name: Hosting Panel Team
+home: https://github.com/hosting-panel/hosting-panel
+sources:
+  - https://github.com/hosting-panel/hosting-panel
+
+dependencies:
+  - name: keycloak
+    version: "25.2.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: keycloak.enabled
+
+  - name: mariadb-galera
+    version: "16.0.1"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: mariadbGalera.enabled
+
+  - name: cert-manager
+    version: "v1.19.4"
+    repository: "https://charts.jetstack.io"
+    condition: certManager.enabled
+
+  - name: contour
+    version: "21.1.4"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: contour.enabled
+
+  - name: metallb
+    version: "6.4.22"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: metallb.enabled
+
+  - name: longhorn
+    version: "1.11.0"
+    repository: "https://charts.longhorn.io"
+    condition: longhorn.enabled
+
+  - name: phpmyadmin
+    version: "19.0.23"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: phpmyadmin.enabled

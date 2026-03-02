@@ -1,0 +1,68 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-panel
+  labels:
+    {{- include "hosting-panel.panelLabels" . | nindent 4 }}
+rules:
+  # CRD management — Website, Database, EmailAccount, EmailDomain, SFTPAccount, HostingPlan
+  - apiGroups: ["hosting.hosting.panel"]
+    resources: ["websites", "databases", "emailaccounts", "emaildomains", "sftpaccounts", "hostingplans"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["hosting.hosting.panel"]
+    resources: ["websites/status", "databases/status", "emailaccounts/status", "emaildomains/status", "sftpaccounts/status", "hostingplans/status"]
+    verbs: ["get", "update", "patch"]
+  # NetworkPolicy — firewall rules management
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Deployments, Services, Pods
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services", "pods", "pods/log", "pods/exec", "configmaps", "secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Namespaces — per-user namespace management
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  # PVCs
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # HTTPProxy (Contour)
+  - apiGroups: ["projectcontour.io"]
+    resources: ["httpproxies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Certificates (cert-manager)
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates", "certificaterequests"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ResourceQuotas and LimitRanges
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # CronJobs for backups
+  - apiGroups: ["batch"]
+    resources: ["cronjobs", "jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-panel
+  labels:
+    {{- include "hosting-panel.panelLabels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "hosting-panel.fullname" . }}-panel
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "hosting-panel.fullname" . }}-panel
+    namespace: {{ include "hosting-panel.namespace" . }}

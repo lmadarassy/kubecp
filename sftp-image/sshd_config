@@ -1,0 +1,35 @@
+# =============================================================================
+# OpenSSH SFTP-only config — Keycloak PAM auth via pam-keycloak-oidc
+# =============================================================================
+Port 2022
+
+# Host keys (generated at startup)
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Authentication — PAM handles Keycloak OIDC validation
+UsePAM yes
+PasswordAuthentication yes
+KbdInteractiveAuthentication yes
+PermitRootLogin no
+PubkeyAuthentication no
+PermitEmptyPasswords no
+
+# SFTP only — no shell access
+Subsystem sftp internal-sftp
+ForceCommand internal-sftp
+
+# Logging
+LogLevel VERBOSE
+SyslogFacility AUTH
+
+# Security hardening
+X11Forwarding no
+AllowTcpForwarding no
+AllowAgentForwarding no
+PermitTunnel no
+MaxAuthTries 3
+LoginGraceTime 30
+ClientAliveInterval 300
+ClientAliveCountMax 2

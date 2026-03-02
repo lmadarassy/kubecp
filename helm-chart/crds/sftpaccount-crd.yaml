@@ -1,0 +1,91 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: sftpaccounts.hosting.hosting.panel
+spec:
+  group: hosting.hosting.panel
+  names:
+    kind: SFTPAccount
+    listKind: SFTPAccountList
+    plural: sftpaccounts
+    singular: sftpaccount
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.username
+      name: Username
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: SFTPAccount is the Schema for the sftpaccounts API.
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              allowedPaths:
+                items:
+                  type: string
+                minItems: 1
+                type: array
+              username:
+                minLength: 1
+                type: string
+              userVolumeName:
+                description: Name of the User_Volume PVC (uv-{username}).
+                minLength: 1
+                type: string
+            required: [allowedPaths, username, userVolumeName]
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      maxLength: 1024
+                      minLength: 1
+                      type: string
+                    status:
+                      enum: ["True", "False", "Unknown"]
+                      type: string
+                    type:
+                      maxLength: 316
+                      type: string
+                  required: [lastTransitionTime, message, reason, status, type]
+                  type: object
+                type: array
+              phase:
+                enum: [Pending, Active, Error, Terminating]
+                type: string
+            type: object
+        required: [spec]
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

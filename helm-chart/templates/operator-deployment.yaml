@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-operator
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.operatorLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.operator.replicas }}
+  selector:
+    matchLabels:
+      {{- include "hosting-panel.operatorSelectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        {{- include "hosting-panel.operatorSelectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "hosting-panel.fullname" . }}-operator
+      imagePullSecrets:
+        - name: dockerhub-creds
+      containers:
+        - name: operator
+          image: "{{ .Values.operator.image.repository }}:{{ .Values.operator.image.tag }}"
+          imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          ports:
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: MARIADB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting-panel.fullname" . }}-mariadb-galera
+                  key: mariadb-root-password
+            - name: PDNS_API_URL
+              value: "http://{{ include "hosting-panel.fullname" . }}-powerdns:8081"
+            - name: PDNS_API_KEY
+              value: {{ .Values.powerdns.api.key | quote }}
+            - name: EXTERNAL_IP
+              value: {{ .Values.externalIP | default "" | quote }}
+            - name: GALERA_HOST
+              value: {{ include "hosting-panel.galeraHost" . | quote }}
+            - name: GALERA_PORT
+              value: "3306"
+            - name: GALERA_USER
+              value: {{ .Values.mariadbGalera.db.user | quote }}
+            - name: GALERA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting-panel.fullname" . }}-db-credentials
+                  key: password
+            - name: KEYCLOAK_URL
+              value: {{ include "hosting-panel.keycloakUrl" . | quote }}
+            - name: KEYCLOAK_REALM
+              value: {{ .Values.panel.oidc.realm | quote }}
+            - name: NODE_COUNT
+              value: {{ .Values.global.nodeCount | quote }}
+            - name: STORAGE_CLASS
+              value: {{ .Values.global.storageClass | quote }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.operator.resources | nindent 12 }}

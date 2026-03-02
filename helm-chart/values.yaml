@@ -1,0 +1,444 @@
+# =============================================================================
+# Hosting Panel — Platform Helm Chart Default Values
+# =============================================================================
+
+# -- Global settings
+global:
+  # -- Platform hostname (FQDN for the panel UI and services)
+  hostname: "panel.example.com"
+  # -- Number of cluster nodes: 1 (single-node) or 3 (HA)
+  nodeCount: 3
+  # -- Default storage class (Longhorn)
+  storageClass: "longhorn"
+  # -- Storage class for databases (needs fsync — not suitable for FUSE-based storage)
+  # -- Platform namespace for core components
+  namespace: "hosting-system"
+  # -- Network mode: "single-ip" (hostNetwork + NodePort) or "multi-ip" (MetalLB LoadBalancer)
+  # single-ip: All services share the node IP, Contour/Envoy uses hostNetwork on ports 80/443
+  # multi-ip: Each service type gets a dedicated LoadBalancer IP via MetalLB allow-shared-ip
+  networkMode: "single-ip"
+  # -- LoadBalancer IP for multi-ip mode (MetalLB assigns this IP to all hosting services)
+  loadBalancerIP: ""
+
+# =============================================================================
+# Panel Core — Go backend + Angular frontend
+# =============================================================================
+panel:
+  image:
+    repository: hosting-panel/panel-core
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  ui:
+    image:
+      repository: hosting-panel/panel-ui
+      tag: "0.1.0"
+      pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  service:
+    type: ClusterIP
+    port: 8080
+  # -- Keycloak OIDC settings for the panel
+  oidc:
+    issuerUrl: ""  # auto-derived from keycloak config if empty
+    clientId: "panel-ui"
+    realm: "hosting"
+  # -- Prometheus metrics
+  metrics:
+    enabled: true
+    port: 9090
+
+# =============================================================================
+# Hosting Operator
+# =============================================================================
+operator:
+  image:
+    repository: hosting-panel/hosting-operator
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# =============================================================================
+# PowerDNS — Authoritative DNS Server
+# =============================================================================
+powerdns:
+  enabled: true
+  image:
+    repository: powerdns/pdns-auth-48
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+  storage:
+    size: "5Gi"
+  # -- PowerDNS REST API
+  api:
+    enabled: true
+    port: 8081
+    key: ""
+  # -- DNS service ports
+  service:
+    dnsPort: 53
+    apiPort: 8081
+    type: LoadBalancer
+  # -- Backend: sqlite or gmysql (galera)
+  backend: "gmysql"
+
+# =============================================================================
+# SFTP Pod
+# =============================================================================
+sftp:
+  enabled: true
+  image:
+    repository: hosting-panel-sftp
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+  service:
+    type: LoadBalancer
+    port: 22
+
+# =============================================================================
+# Mail System — Postfix (SMTP) + Dovecot (IMAP/POP3)
+# =============================================================================
+mail:
+  # Keycloak OIDC client for Dovecot checkpassword auth
+  keycloak:
+    clientSecret: ""
+  smtp:
+    enabled: true
+    image:
+      repository: boky/postfix
+      tag: "latest"
+      pullPolicy: IfNotPresent
+    replicas: 1
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "250m"
+        memory: "256Mi"
+    service:
+      type: LoadBalancer
+      port: 25
+      submissionPort: 587
+  imap:
+    enabled: true
+    image:
+      repository: dovecot/dovecot
+      tag: "2.3"
+      pullPolicy: IfNotPresent
+    replicas: 1
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "250m"
+        memory: "256Mi"
+    service:
+      type: LoadBalancer
+      imapPort: 143
+      imapsPort: 993
+      pop3Port: 110
+      pop3sPort: 995
+  storage:
+    size: "20Gi"
+
+# =============================================================================
+# Roundcube Webmail
+# =============================================================================
+roundcube:
+  enabled: true
+  image:
+    repository: roundcube/roundcubemail
+    tag: "1.6.9-apache"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "256Mi"
+
+# =============================================================================
+# Rspamd — Spam filtering with milter interface for Postfix
+# =============================================================================
+rspamd:
+  enabled: true
+  image:
+    repository: rspamd/rspamd
+    tag: "3.11.2-alpine"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  service:
+    # Milter port for Postfix integration
+    milterPort: 11332
+    # Web UI / API port
+    webPort: 11334
+
+# =============================================================================
+# ClamAV — Antivirus scanning for email
+# =============================================================================
+clamav:
+  enabled: true
+  image:
+    repository: clamav/clamav
+    tag: "1.4"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  service:
+    port: 3310
+  storage:
+    # ClamAV virus definition database storage
+    size: "2Gi"
+
+# =============================================================================
+# Backup CronJob
+# =============================================================================
+backup:
+  enabled: true
+  image:
+    repository: hosting-panel/backup-job
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  # -- Default schedule (daily at 2:00 AM)
+  schedule: "0 2 * * *"
+  # -- Default retention (number of backups to keep)
+  retentionCount: 7
+  # -- Storage destination: s3, sftp, or local
+  destination: "local"
+  storage:
+    size: "50Gi"
+  # -- S3 settings (when destination=s3)
+  s3:
+    endpoint: ""
+    bucket: ""
+    accessKey: ""
+    secretKey: ""
+  # -- SFTP settings (when destination=sftp)
+  sftpRemote:
+    host: ""
+    port: 22
+    username: ""
+    keySecret: ""
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# =============================================================================
+# cert-manager — ClusterIssuer settings
+# =============================================================================
+certManager:
+  enabled: true
+  installCRDs: true
+  clusterIssuers:
+    # -- Admin email for ACME registration
+    email: "admin@example.com"
+    staging:
+      enabled: true
+      server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+    production:
+      enabled: true
+      server: "https://acme-v02.api.letsencrypt.org/directory"
+
+# =============================================================================
+# MetalLB — L2 Load Balancer for bare metal
+# =============================================================================
+metallb:
+  enabled: true
+  # -- IP address pool for LoadBalancer services
+  ipAddressPool:
+    name: "hosting-pool"
+    # -- IP range to allocate (adjust to your network)
+    addresses:
+      - "192.168.1.240-192.168.1.250"
+  l2Advertisement:
+    name: "hosting-l2advert"
+
+# =============================================================================
+# Contour — Envoy-based Ingress Controller
+# =============================================================================
+contour:
+  enabled: true
+  envoy:
+    service:
+      # In single-ip mode: Envoy uses hostNetwork (ports 80/443 directly on node)
+      # In multi-ip mode: Envoy uses LoadBalancer with MetalLB shared IP
+      type: LoadBalancer
+    # hostNetwork is enabled in single-ip mode via Helm override in install script
+    hostNetwork: false
+  # Contour config for single-ip mode (set via install script):
+  # contour.envoy.hostNetwork=true, contour.envoy.service.type=ClusterIP
+
+# =============================================================================
+# Keycloak — Identity Provider
+# =============================================================================
+keycloak:
+  enabled: true
+  auth:
+    adminUser: "admin"
+    adminPassword: ""  # generated by install script if empty
+  # -- Hosting realm configuration
+  realm:
+    name: "hosting"
+    roles:
+      - "admin"
+      - "user"
+    oidcClient:
+      clientId: "panel-ui"
+      redirectUris:
+        - "https://panel.example.com/*"
+      webOrigins:
+        - "https://panel.example.com"
+    ldapFederation:
+      enabled: true
+      connectionUrl: "ldap://localhost"
+      usersDn: "ou=users,dc=hosting,dc=panel"
+      bindDn: "cn=admin,dc=hosting,dc=panel"
+      bindCredential: ""
+  postgresql:
+    enabled: false
+  externalDatabase:
+    host: "mariadb-galera.hosting-system.svc.cluster.local"
+    port: 3306
+    database: "keycloak"
+    user: "keycloak"
+    password: ""
+  persistence:
+    enabled: true
+    storageClass: "longhorn"
+    size: "5Gi"
+
+# =============================================================================
+# MariaDB Galera Cluster
+# =============================================================================
+mariadbGalera:
+  enabled: true
+  # -- Root password (set via install script)
+  rootUser:
+    password: ""
+  # -- Galera replication settings
+  galera:
+    mariabackup:
+      password: ""
+  # -- Replica count: auto-set based on global.nodeCount
+  # 3-node cluster → 3 replicas, 1-node → 1 replica
+  replicaCount: 3
+  persistence:
+    enabled: true
+    storageClass: "longhorn"
+    size: "10Gi"
+  # -- Database initialization
+  db:
+    name: "hosting"
+    user: "hosting"
+    password: ""
+
+# =============================================================================
+# Longhorn — Distributed Block Storage
+# =============================================================================
+longhorn:
+  enabled: true
+  defaultSettings:
+    # -- Default replica count: auto-set based on global.nodeCount
+    # 3-node → 3 replicas, 1-node → 1 replica
+    defaultReplicaCount: 3
+    # -- Guaranteed engine manager CPU
+    guaranteedEngineManagerCPU: 12
+    # -- Guaranteed replica manager CPU
+    guaranteedReplicaManagerCPU: 12
+
+# =============================================================================
+# phpMyAdmin
+# =============================================================================
+phpmyadmin:
+  enabled: true
+  db:
+    host: "mariadb-galera.hosting-system.svc.cluster.local"
+    port: 3306
+
+# =============================================================================
+# Monitoring — Prometheus + Grafana (kube-prometheus-stack)
+# =============================================================================
+monitoring:
+  enabled: true
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: longhorn
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+      serviceMonitorSelectorNilUsesHelmValues: false
+  grafana:
+    enabled: true
+    adminPassword: ""  # set via install script
+    persistence:
+      enabled: true
+      storageClassName: longhorn
+      size: 5Gi
+    sidecar:
+      dashboards:
+        enabled: true
+        searchNamespace: ALL
+  # Disable components not needed on k3s single-node
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  kubeProxy:
+    enabled: false

@@ -1,0 +1,154 @@
+{{/*
+  Multi-IP mode: Each service type gets a LoadBalancer IP via MetalLB.
+  All services share the same IP using metallb.io/allow-shared-ip annotation.
+*/}}
+{{- if eq .Values.global.networkMode "multi-ip" }}
+---
+# =============================================================================
+# Multi-IP Mode — SFTP LoadBalancer Service
+# =============================================================================
+{{- if .Values.sftp.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-sftp-lb
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: sftp
+  annotations:
+    hosting.panel/network-mode: "multi-ip"
+    metallb.io/allow-shared-ip: "hosting-platform"
+    metallb.io/address-pool: {{ .Values.metallb.ipAddressPool.name | quote }}
+spec:
+  type: LoadBalancer
+  {{- if .Values.global.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.global.loadBalancerIP | quote }}
+  {{- end }}
+  ports:
+    - name: sftp
+      port: {{ .Values.sftp.service.port }}
+      targetPort: sftp
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: sftp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+# =============================================================================
+# Multi-IP Mode — Mail SMTP LoadBalancer Service
+# =============================================================================
+{{- if .Values.mail.smtp.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-mail-smtp-lb
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-smtp
+  annotations:
+    hosting.panel/network-mode: "multi-ip"
+    metallb.io/allow-shared-ip: "hosting-platform"
+    metallb.io/address-pool: {{ .Values.metallb.ipAddressPool.name | quote }}
+spec:
+  type: LoadBalancer
+  {{- if .Values.global.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.global.loadBalancerIP | quote }}
+  {{- end }}
+  ports:
+    - name: smtp
+      port: {{ .Values.mail.smtp.service.port }}
+      targetPort: smtp
+      protocol: TCP
+    - name: submission
+      port: {{ .Values.mail.smtp.service.submissionPort }}
+      targetPort: submission
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mail-smtp
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+# =============================================================================
+# Multi-IP Mode — Mail IMAP LoadBalancer Service
+# =============================================================================
+{{- if .Values.mail.imap.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-mail-imap-lb
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-imap
+  annotations:
+    hosting.panel/network-mode: "multi-ip"
+    metallb.io/allow-shared-ip: "hosting-platform"
+    metallb.io/address-pool: {{ .Values.metallb.ipAddressPool.name | quote }}
+spec:
+  type: LoadBalancer
+  {{- if .Values.global.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.global.loadBalancerIP | quote }}
+  {{- end }}
+  ports:
+    - name: imap
+      port: {{ .Values.mail.imap.service.imapPort }}
+      targetPort: imap
+      protocol: TCP
+    - name: imaps
+      port: {{ .Values.mail.imap.service.imapsPort }}
+      targetPort: imaps
+      protocol: TCP
+    - name: pop3
+      port: {{ .Values.mail.imap.service.pop3Port }}
+      targetPort: pop3
+      protocol: TCP
+    - name: pop3s
+      port: {{ .Values.mail.imap.service.pop3sPort }}
+      targetPort: pop3s
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: mail-imap
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+---
+# =============================================================================
+# Multi-IP Mode — PowerDNS LoadBalancer Service
+# =============================================================================
+{{- if .Values.powerdns.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-powerdns-lb
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: powerdns
+  annotations:
+    hosting.panel/network-mode: "multi-ip"
+    metallb.io/allow-shared-ip: "hosting-platform"
+    metallb.io/address-pool: {{ .Values.metallb.ipAddressPool.name | quote }}
+spec:
+  type: LoadBalancer
+  {{- if .Values.global.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.global.loadBalancerIP | quote }}
+  {{- end }}
+  ports:
+    - name: dns-tcp
+      port: {{ .Values.powerdns.service.dnsPort }}
+      targetPort: dns-tcp
+      protocol: TCP
+    - name: dns-udp
+      port: {{ .Values.powerdns.service.dnsPort }}
+      targetPort: dns-udp
+      protocol: UDP
+    - name: api
+      port: {{ .Values.powerdns.service.apiPort }}
+      targetPort: api
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: powerdns
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+{{- end }}

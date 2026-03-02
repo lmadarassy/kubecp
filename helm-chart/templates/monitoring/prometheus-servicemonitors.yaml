@@ -1,0 +1,63 @@
+{{- if .Values.monitoring.enabled }}
+# =============================================================================
+# ServiceMonitor — Panel Core metrics scraping
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-panel
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: panel-core
+  endpoints:
+    - port: api
+      path: /metrics
+      interval: 30s
+---
+# =============================================================================
+# ServiceMonitor — Hosting Operator metrics scraping
+# =============================================================================
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-operator
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hosting-operator
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+---
+# =============================================================================
+# ServiceMonitor — PowerDNS metrics (via API)
+# =============================================================================
+{{- if .Values.powerdns.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-powerdns
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: powerdns
+  endpoints:
+    - port: api
+      path: /metrics
+      interval: 60s
+{{- end }}
+{{- end }}

@@ -1,0 +1,32 @@
+{{- if and .Values.certManager.enabled .Values.certManager.clusterIssuers.staging.enabled }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+spec:
+  acme:
+    server: {{ .Values.certManager.clusterIssuers.staging.server }}
+    email: {{ .Values.certManager.clusterIssuers.email }}
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      # HTTP-01 challenge via Contour/Envoy
+      - http01:
+          ingress:
+            class: contour
+      # DNS-01 challenge for wildcard certificates (PowerDNS webhook)
+      - dns01:
+          webhook:
+            groupName: acme.hosting.panel
+            solverName: powerdns
+            config:
+              apiUrl: {{ include "hosting-panel.powerdnsApiUrl" . | quote }}
+              apiKeySecretRef:
+                name: {{ include "hosting-panel.fullname" . }}-powerdns-api
+                key: api-key
+        selector:
+          matchLabels:
+            use-dns01-solver: "true"
+{{- end }}

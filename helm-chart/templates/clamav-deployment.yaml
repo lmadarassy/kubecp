@@ -1,0 +1,108 @@
+{{- if .Values.clamav.enabled }}
+# =============================================================================
+# ClamAV — Antivirus Scanner Deployment
+# Provides virus scanning for Rspamd email filtering
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-clamav
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/component: mail
+spec:
+  replicas: {{ .Values.clamav.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clamav
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clamav
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: clamav
+          image: "{{ .Values.clamav.image.repository }}:{{ .Values.clamav.image.tag }}"
+          imagePullPolicy: {{ .Values.clamav.image.pullPolicy }}
+          ports:
+            - name: clamd
+              containerPort: {{ .Values.clamav.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.clamav.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: clamd
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            failureThreshold: 10
+          readinessProbe:
+            tcpSocket:
+              port: clamd
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            failureThreshold: 10
+          volumeMounts:
+            - name: clamav-config
+              mountPath: /etc/clamav/clamd.conf
+              subPath: clamd.conf
+              readOnly: true
+            - name: clamav-config
+              mountPath: /etc/clamav/freshclam.conf
+              subPath: freshclam.conf
+              readOnly: true
+            - name: clamav-data
+              mountPath: /var/lib/clamav
+      volumes:
+        - name: clamav-config
+          configMap:
+            name: {{ include "hosting-panel.fullname" . }}-clamav-config
+        - name: clamav-data
+          persistentVolumeClaim:
+            claimName: {{ include "hosting-panel.fullname" . }}-clamav-data
+---
+# =============================================================================
+# ClamAV — Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-clamav
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: clamav
+spec:
+  type: ClusterIP
+  ports:
+    - name: clamd
+      port: {{ .Values.clamav.service.port }}
+      targetPort: clamd
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/instance: {{ .Release.Name }}
+---
+# =============================================================================
+# ClamAV — PVC for virus definition database
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-clamav-data
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: clamav
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.clamav.storage.size }}
+{{- end }}

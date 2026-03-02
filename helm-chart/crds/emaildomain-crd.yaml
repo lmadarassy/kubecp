@@ -1,0 +1,110 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: emaildomains.hosting.hosting.panel
+spec:
+  group: hosting.hosting.panel
+  names:
+    kind: EmailDomain
+    listKind: EmailDomainList
+    plural: emaildomains
+    singular: emaildomain
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.domain
+      name: Domain
+      type: string
+    - jsonPath: .spec.owner
+      name: Owner
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.accountCount
+      name: Accounts
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: EmailDomain is the Schema for the emaildomains API.
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: EmailDomainSpec defines the desired state of EmailDomain.
+            properties:
+              domain:
+                description: Email domain name.
+                minLength: 1
+                type: string
+              owner:
+                description: Username who owns this email domain.
+                minLength: 1
+                type: string
+              catchAll:
+                description: Email address to receive all unmatched mail.
+                type: string
+              spamFilter:
+                default: true
+                description: Enable/disable Rspamd spam filtering.
+                type: boolean
+            required:
+            - domain
+            - owner
+            type: object
+          status:
+            properties:
+              phase:
+                enum: [Pending, Active, Error, Terminating]
+                type: string
+              dkimSecretName:
+                description: Secret name containing DKIM private key.
+                type: string
+              accountCount:
+                description: Number of email accounts under this domain.
+                format: int32
+                type: integer
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      maxLength: 1024
+                      minLength: 1
+                      type: string
+                    status:
+                      enum: ["True", "False", "Unknown"]
+                      type: string
+                    type:
+                      maxLength: 316
+                      type: string
+                  required: [lastTransitionTime, message, reason, status, type]
+                  type: object
+                type: array
+            type: object
+        required: [spec]
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

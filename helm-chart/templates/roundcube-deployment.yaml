@@ -1,0 +1,105 @@
+{{- if .Values.roundcube.enabled }}
+# =============================================================================
+# Roundcube Webmail — Deployment with IMAP auth against Dovecot
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-roundcube
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: roundcube
+    app.kubernetes.io/component: webmail
+spec:
+  replicas: {{ .Values.roundcube.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: roundcube
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: roundcube
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-creds
+      containers:
+        - name: roundcube
+          image: "{{ .Values.roundcube.image.repository }}:{{ .Values.roundcube.image.tag }}"
+          imagePullPolicy: {{ .Values.roundcube.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          env:
+            # IMAP server — Dovecot service
+            - name: ROUNDCUBEMAIL_DEFAULT_HOST
+              value: "{{ include "hosting-panel.fullname" . }}-mail-imap"
+            - name: ROUNDCUBEMAIL_DEFAULT_PORT
+              value: "143"
+            # SMTP server — Postfix service
+            - name: ROUNDCUBEMAIL_SMTP_SERVER
+              value: "{{ include "hosting-panel.fullname" . }}-mail-smtp"
+            - name: ROUNDCUBEMAIL_SMTP_PORT
+              value: "587"
+            # Database for session/cache storage — Galera cluster
+            - name: ROUNDCUBEMAIL_DB_TYPE
+              value: "mysql"
+            - name: ROUNDCUBEMAIL_DB_HOST
+              value: {{ include "hosting-panel.galeraHost" . | quote }}
+            - name: ROUNDCUBEMAIL_DB_PORT
+              value: "3306"
+            - name: ROUNDCUBEMAIL_DB_NAME
+              value: "roundcube"
+            - name: ROUNDCUBEMAIL_DB_USER
+              value: "roundcube"
+            - name: ROUNDCUBEMAIL_DB_PASSWORD
+              value: {{ .Values.mariadbGalera.db.password | quote }}
+            # Product name and branding
+            - name: ROUNDCUBEMAIL_PRODUCT_NAME
+              value: "Hosting Panel Webmail"
+            # Skin
+            - name: ROUNDCUBEMAIL_SKIN
+              value: "elastic"
+            # Upload size limit (25MB to match Postfix)
+            - name: ROUNDCUBEMAIL_UPLOAD_MAX_FILESIZE
+              value: "25M"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.roundcube.resources | nindent 12 }}
+---
+# =============================================================================
+# Roundcube Webmail — Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-roundcube
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: roundcube
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: roundcube
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

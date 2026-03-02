@@ -1,0 +1,54 @@
+{{- if .Values.phpmyadmin.enabled }}
+# =============================================================================
+# phpMyAdmin — HTTPProxy for Contour/Envoy web access
+# Authenticates against Galera cluster with database credentials
+# =============================================================================
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-phpmyadmin
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: phpmyadmin
+    app.kubernetes.io/component: database
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+spec:
+  virtualhost:
+    fqdn: phpmyadmin.{{ .Values.global.hostname }}
+    {{- if .Values.certManager.enabled }}
+    tls:
+      secretName: {{ include "hosting-panel.fullname" . }}-phpmyadmin-tls
+    {{- end }}
+  routes:
+    - conditions:
+        - prefix: /
+      services:
+        - name: {{ .Release.Name }}-phpmyadmin
+          port: 80
+      timeoutPolicy:
+        response: 120s
+        idle: 300s
+{{- if .Values.certManager.enabled }}
+---
+# =============================================================================
+# phpMyAdmin — TLS Certificate via cert-manager
+# =============================================================================
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-phpmyadmin-tls
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: phpmyadmin
+spec:
+  secretName: {{ include "hosting-panel.fullname" . }}-phpmyadmin-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - phpmyadmin.{{ .Values.global.hostname }}
+{{- end }}
+{{- end }}

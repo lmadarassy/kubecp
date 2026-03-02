@@ -1,0 +1,27 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-keycloak
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity
+spec:
+  virtualhost:
+    fqdn: keycloak.{{ .Values.global.hostname }}
+    {{- if .Values.certManager.enabled }}
+    tls:
+      secretName: {{ include "hosting-panel.fullname" . }}-keycloak-tls
+    {{- end }}
+  routes:
+    - conditions:
+        - prefix: /
+      services:
+        - name: {{ .Release.Name }}-keycloak
+          port: 80
+      timeoutPolicy:
+        response: 120s
+        idle: 300s
+{{- end }}

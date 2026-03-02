@@ -1,0 +1,160 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: hostingplans.hosting.hosting.panel
+spec:
+  group: hosting.hosting.panel
+  names:
+    kind: HostingPlan
+    listKind: HostingPlanList
+    plural: hostingplans
+    singular: hostingplan
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.displayName
+      name: Display Name
+      type: string
+    - jsonPath: .spec.limits.websites
+      name: Websites
+      type: integer
+    - jsonPath: .spec.limits.databases
+      name: Databases
+      type: integer
+    - jsonPath: .spec.limits.storageGB
+      name: Storage(GB)
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: HostingPlan is the Schema for the hostingplans API.
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: HostingPlanSpec defines the desired state of HostingPlan.
+            properties:
+              displayName:
+                description: Human-readable plan name.
+                minLength: 1
+                type: string
+              limits:
+                description: Resource limits for this plan.
+                properties:
+                  websites:
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  databases:
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  emailAccounts:
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  emailDomains:
+                    default: 5
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  emailAccountsPerDomain:
+                    default: 50
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  cronJobs:
+                    default: 10
+                    format: int32
+                    minimum: 0
+                    type: integer
+                  storageGB:
+                    format: int32
+                    minimum: 1
+                    type: integer
+                  cpuMillicores:
+                    format: int32
+                    minimum: 100
+                    type: integer
+                  memoryMB:
+                    format: int32
+                    minimum: 128
+                    type: integer
+                required:
+                - websites
+                - databases
+                - emailAccounts
+                - storageGB
+                - cpuMillicores
+                - memoryMB
+                type: object
+              defaults:
+                description: Default settings for new resources.
+                properties:
+                  php:
+                    properties:
+                      version:
+                        default: "8.2"
+                        enum: ["7.4", "8.0", "8.1", "8.2", "8.3", "8.4", "8.5"]
+                        type: string
+                      configProfile:
+                        default: "default"
+                        type: string
+                    type: object
+                  website:
+                    properties:
+                      replicas:
+                        default: 1
+                        format: int32
+                        type: integer
+                    type: object
+                type: object
+            required:
+            - displayName
+            - limits
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      maxLength: 1024
+                      minLength: 1
+                      type: string
+                    status:
+                      enum: ["True", "False", "Unknown"]
+                      type: string
+                    type:
+                      maxLength: 316
+                      type: string
+                  required: [lastTransitionTime, message, reason, status, type]
+                  type: object
+                type: array
+            type: object
+        required: [spec]
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -1,0 +1,124 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: emailaccounts.hosting.hosting.panel
+spec:
+  group: hosting.hosting.panel
+  names:
+    kind: EmailAccount
+    listKind: EmailAccountList
+    plural: emailaccounts
+    singular: emailaccount
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.address
+      name: Address
+      type: string
+    - jsonPath: .spec.domain
+      name: Domain
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .spec.quotaMB
+      name: Quota
+      type: integer
+    - jsonPath: .status.usedMB
+      name: Used
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: EmailAccount is the Schema for the emailaccounts API.
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              address:
+                minLength: 3
+                pattern: ^[^@]+@[^@]+\.[^@]+$
+                type: string
+              domain:
+                description: Email domain (must match an existing EmailDomain).
+                minLength: 1
+                type: string
+              quotaMB:
+                default: 1024
+                format: int32
+                minimum: 1
+                type: integer
+              forwarding:
+                description: Email forwarding configuration.
+                properties:
+                  enabled:
+                    type: boolean
+                  addresses:
+                    items:
+                      type: string
+                    type: array
+                  keepCopy:
+                    default: true
+                    type: boolean
+                required: [enabled]
+                type: object
+              passwordHash:
+                description: "Dovecot-compatible password hash for IMAP/SMTP auth. Format: {SHA512-CRYPT}$6$..."
+                type: string
+            required: [address, domain]
+            type: object
+          status:
+            properties:
+              phase:
+                enum: [Pending, Creating, Active, Error, Terminating]
+                type: string
+              maildirPath:
+                description: "Path to maildir on User_Volume: mail/{domain}/{account}/"
+                type: string
+              usedMB:
+                format: int32
+                type: integer
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      maxLength: 1024
+                      minLength: 1
+                      type: string
+                    status:
+                      enum: ["True", "False", "Unknown"]
+                      type: string
+                    type:
+                      maxLength: 316
+                      type: string
+                  required: [lastTransitionTime, message, reason, status, type]
+                  type: object
+                type: array
+            type: object
+        required: [spec]
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

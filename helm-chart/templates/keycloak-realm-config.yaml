@@ -1,0 +1,279 @@
+{{- if .Values.keycloak.enabled }}
+# Post-install Job to configure Keycloak hosting realm, roles, OIDC client, and LDAP federation
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-keycloak-setup
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: keycloak-setup
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 5
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak-setup
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        {{- range .Values.global.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      containers:
+        - name: keycloak-setup
+          image: curlimages/curl:8.5.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              KC_URL="{{ include "hosting-panel.keycloakUrl" . }}"
+              KC_ADMIN="{{ .Values.keycloak.auth.adminUser }}"
+              KC_PASS="${KEYCLOAK_ADMIN_PASSWORD}"
+              REALM="{{ .Values.keycloak.realm.name }}"
+              CLIENT_ID="{{ .Values.keycloak.realm.oidcClient.clientId }}"
+
+              echo "Waiting for Keycloak to be ready..."
+              until curl -sf "${KC_URL}/realms/master" > /dev/null 2>&1; do
+                echo "Keycloak not ready, retrying in 5s..."
+                sleep 5
+              done
+              echo "Keycloak is ready."
+
+              # Get admin token
+              TOKEN=$(curl -sf -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
+                -H "Content-Type: application/x-www-form-urlencoded" \
+                -d "username=${KC_ADMIN}" \
+                -d "password=${KC_PASS}" \
+                -d "grant_type=password" \
+                -d "client_id=admin-cli" | sed 's/.*"access_token":"\([^"]*\)".*/\1/')
+
+              if [ -z "$TOKEN" ]; then
+                echo "ERROR: Failed to get admin token"
+                exit 1
+              fi
+
+              # Create hosting realm (ignore 409 if exists)
+              echo "Creating realm: ${REALM}"
+              curl -sf -o /dev/null -w "%{http_code}" -X POST "${KC_URL}/admin/realms" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{\"realm\":\"${REALM}\",\"enabled\":true}" || true
+
+              # Create admin role
+              echo "Creating admin role..."
+              curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/roles" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{"name":"admin","description":"Platform administrator"}' || true
+
+              # Create user role
+              echo "Creating user role..."
+              curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/roles" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{"name":"user","description":"Hosting user"}' || true
+
+              # Create OIDC client for panel-ui
+              echo "Creating OIDC client: ${CLIENT_ID}"
+              curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/clients" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"clientId\":\"${CLIENT_ID}\",
+                  \"enabled\":true,
+                  \"publicClient\":true,
+                  \"directAccessGrantsEnabled\":true,
+                  \"standardFlowEnabled\":true,
+                  \"redirectUris\":[\"http://{{ .Values.global.hostname }}/*\",\"https://{{ .Values.global.hostname }}/*\"{{- if .Values.externalIP }},\"http://{{ .Values.externalIP }}/*\",\"https://{{ .Values.externalIP }}/*\"{{- end }}],
+                  \"webOrigins\":[\"http://{{ .Values.global.hostname }}\",\"https://{{ .Values.global.hostname }}\"{{- if .Values.externalIP }},\"http://{{ .Values.externalIP }}\",\"https://{{ .Values.externalIP }}\"{{- end }}],
+                  \"protocol\":\"openid-connect\",
+                  \"attributes\":{\"pkce.code.challenge.method\":\"S256\"}
+                }" || true
+
+              # Get panel-ui client UUID
+              echo "Getting panel-ui client UUID..."
+              CLIENT_UUID=$(curl -sf "${KC_URL}/admin/realms/${REALM}/clients?clientId=${CLIENT_ID}" \
+                -H "Authorization: Bearer ${TOKEN}" | grep -o '"id":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+              echo "panel-ui client UUID: ${CLIENT_UUID}"
+
+              # Add realm roles protocol mapper to panel-ui client
+              # This ensures realm_access.roles is included in the JWT token
+              if [ -n "${CLIENT_UUID}" ]; then
+                echo "Adding realm-roles protocol mapper to ${CLIENT_ID}..."
+                curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/clients/${CLIENT_UUID}/protocol-mappers/models" \
+                  -H "Authorization: Bearer ${TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{
+                    \"name\":\"realm roles\",
+                    \"protocol\":\"openid-connect\",
+                    \"protocolMapper\":\"oidc-usermodel-realm-role-mapper\",
+                    \"consentRequired\":false,
+                    \"config\":{
+                      \"multivalued\":\"true\",
+                      \"userinfo.token.claim\":\"true\",
+                      \"id.token.claim\":\"true\",
+                      \"access.token.claim\":\"true\",
+                      \"claim.name\":\"realm_access.roles\",
+                      \"jsonType.label\":\"String\"
+                    }
+                  }" || true
+              fi
+
+              # Create sftp-client for SFTP ROPC authentication (confidential, direct access only)
+              echo "Creating SFTP OIDC client..."
+              curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/clients" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"clientId\":\"sftp-client\",
+                  \"enabled\":true,
+                  \"publicClient\":false,
+                  \"secret\":\"${SFTP_CLIENT_SECRET}\",
+                  \"directAccessGrantsEnabled\":true,
+                  \"standardFlowEnabled\":false,
+                  \"protocol\":\"openid-connect\"
+                }" || true
+
+              # Add realm-roles protocol mapper to sftp-client
+              # pam-keycloak-oidc looks for claims[scope] where scope="roles",
+              # so we need a flat top-level "roles" array in the JWT access token.
+              echo "Getting sftp-client UUID..."
+              SFTP_UUID=$(curl -sf "${KC_URL}/admin/realms/${REALM}/clients?clientId=sftp-client" \
+                -H "Authorization: Bearer ${TOKEN}" | grep -o '"id":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+              if [ -n "${SFTP_UUID}" ]; then
+                echo "Adding realm-roles mapper to sftp-client (UUID: ${SFTP_UUID})..."
+                curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/clients/${SFTP_UUID}/protocol-mappers/models" \
+                  -H "Authorization: Bearer ${TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "{
+                    \"name\":\"realm roles flat\",
+                    \"protocol\":\"openid-connect\",
+                    \"protocolMapper\":\"oidc-usermodel-realm-role-mapper\",
+                    \"consentRequired\":false,
+                    \"config\":{
+                      \"multivalued\":\"true\",
+                      \"userinfo.token.claim\":\"true\",
+                      \"id.token.claim\":\"true\",
+                      \"access.token.claim\":\"true\",
+                      \"claim.name\":\"roles\",
+                      \"jsonType.label\":\"String\"
+                    }
+                  }" || true
+              fi
+
+              {{- if .Values.keycloak.realm.ldapFederation.enabled }}
+              # Enable LDAP user federation
+              echo "Configuring LDAP federation..."
+              curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/components" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"name\":\"ldap-hosting\",
+                  \"providerId\":\"ldap\",
+                  \"providerType\":\"org.keycloak.storage.UserStorageProvider\",
+                  \"config\":{
+                    \"enabled\":[\"true\"],
+                    \"editMode\":[\"WRITABLE\"],
+                    \"vendor\":[\"other\"],
+                    \"connectionUrl\":[\"{{ .Values.keycloak.realm.ldapFederation.connectionUrl }}\"],
+                    \"usersDn\":[\"{{ .Values.keycloak.realm.ldapFederation.usersDn }}\"],
+                    \"bindDn\":[\"{{ .Values.keycloak.realm.ldapFederation.bindDn }}\"],
+                    \"bindCredential\":[\"${LDAP_BIND_CREDENTIAL}\"],
+                    \"userObjectClasses\":[\"inetOrgPerson, organizationalPerson\"],
+                    \"usernameLDAPAttribute\":[\"uid\"],
+                    \"rdnLDAPAttribute\":[\"uid\"],
+                    \"uuidLDAPAttribute\":[\"entryUUID\"],
+                    \"searchScope\":[\"1\"],
+                    \"pagination\":[\"true\"],
+                    \"importEnabled\":[\"true\"],
+                    \"syncRegistrations\":[\"true\"]
+                  }
+                }" || true
+              {{- end }}
+
+              # Create admin user in the hosting realm (if not exists)
+              echo "Creating admin user in ${REALM} realm..."
+              curl -sf -o /dev/null -w "%{http_code}" -X POST "${KC_URL}/admin/realms/${REALM}/users" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"username\":\"admin\",
+                  \"enabled\":true,
+                  \"emailVerified\":true,
+                  \"firstName\":\"Admin\",
+                  \"lastName\":\"User\",
+                  \"email\":\"admin@localhost\",
+                  \"credentials\":[{\"type\":\"password\",\"value\":\"${KC_PASS}\",\"temporary\":false}]
+                }" || true
+
+              # Assign admin role to the admin user
+              echo "Assigning admin role to admin user..."
+              ADMIN_USER_ID=$(curl -sf "${KC_URL}/admin/realms/${REALM}/users?username=admin" \
+                -H "Authorization: Bearer ${TOKEN}" | grep -o '"id":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+              ADMIN_ROLE_ID=$(curl -sf "${KC_URL}/admin/realms/${REALM}/roles/admin" \
+                -H "Authorization: Bearer ${TOKEN}" | grep -o '"id":"[^"]*"' | head -1 | grep -o '"[^"]*"$' | tr -d '"')
+              if [ -n "${ADMIN_USER_ID}" ] && [ -n "${ADMIN_ROLE_ID}" ]; then
+                echo "Assigning admin role (${ADMIN_ROLE_ID}) to user (${ADMIN_USER_ID})..."
+                curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/users/${ADMIN_USER_ID}/role-mappings/realm" \
+                  -H "Authorization: Bearer ${TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  -d "[{\"id\":\"${ADMIN_ROLE_ID}\",\"name\":\"admin\"}]" || true
+              else
+                echo "WARNING: Could not find admin user or admin role to assign"
+              fi
+
+              # Create mail-client for Dovecot ROPC authentication (confidential, direct access only)
+              echo "Creating mail OIDC client..."
+              curl -sf -o /dev/null -X POST "${KC_URL}/admin/realms/${REALM}/clients" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "{
+                  \"clientId\":\"mail-client\",
+                  \"enabled\":true,
+                  \"publicClient\":false,
+                  \"secret\":\"${MAIL_CLIENT_SECRET}\",
+                  \"directAccessGrantsEnabled\":true,
+                  \"standardFlowEnabled\":false,
+                  \"serviceAccountsEnabled\":false,
+                  \"protocol\":\"openid-connect\"
+                }" || true
+
+              # Set access token lifetime to 30 minutes (for long SFTP sessions, API calls)
+              echo "Setting accessTokenLifespan to 1800s..."
+              curl -sf -o /dev/null -X PUT "${KC_URL}/admin/realms/${REALM}" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{"accessTokenLifespan": 1800}' || true
+
+              echo "Keycloak realm setup complete."
+          env:
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-keycloak
+                  key: admin-password
+                  optional: true
+            {{- if .Values.keycloak.realm.ldapFederation.enabled }}
+            - name: LDAP_BIND_CREDENTIAL
+              value: {{ .Values.keycloak.realm.ldapFederation.bindCredential | quote }}
+            {{- end }}
+            - name: SFTP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting-panel.fullname" . }}-sftp-client
+                  key: secret
+                  optional: true
+            - name: MAIL_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "hosting-panel.fullname" . }}-mail-client
+                  key: secret
+                  optional: true
+{{- end }}

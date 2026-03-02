@@ -1,0 +1,90 @@
+{{- if .Values.rspamd.enabled }}
+# =============================================================================
+# Rspamd — Spam Filter Deployment
+# Integrates with Postfix via milter protocol and ClamAV for virus scanning
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-rspamd
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: rspamd
+    app.kubernetes.io/component: mail
+spec:
+  replicas: {{ .Values.rspamd.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rspamd
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rspamd
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: rspamd
+          image: "{{ .Values.rspamd.image.repository }}:{{ .Values.rspamd.image.tag }}"
+          imagePullPolicy: {{ .Values.rspamd.image.pullPolicy }}
+          ports:
+            - name: milter
+              containerPort: {{ .Values.rspamd.service.milterPort }}
+              protocol: TCP
+            - name: web
+              containerPort: {{ .Values.rspamd.service.webPort }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.rspamd.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: web
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: web
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: rspamd-config
+              mountPath: /etc/rspamd/local.d
+              readOnly: true
+            - name: rspamd-data
+              mountPath: /var/lib/rspamd
+      volumes:
+        - name: rspamd-config
+          configMap:
+            name: {{ include "hosting-panel.fullname" . }}-rspamd-config
+        - name: rspamd-data
+          emptyDir: {}
+---
+# =============================================================================
+# Rspamd — Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-rspamd
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: rspamd
+spec:
+  type: ClusterIP
+  ports:
+    - name: milter
+      port: {{ .Values.rspamd.service.milterPort }}
+      targetPort: milter
+      protocol: TCP
+    - name: web
+      port: {{ .Values.rspamd.service.webPort }}
+      targetPort: web
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: rspamd
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

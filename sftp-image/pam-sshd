@@ -1,0 +1,19 @@
+# PAM config for sshd — authenticate via Keycloak using pam-keycloak-oidc
+# Auth: pam-keycloak-oidc validates credentials against Keycloak OIDC
+# If Keycloak auth fails, fall back to local unix password (for emergency access)
+auth sufficient pam_exec.so expose_authtok log=/var/log/pam-keycloak-oidc.log /opt/pam-keycloak-oidc/pam-keycloak-oidc
+auth sufficient pam_unix.so nullok
+auth required pam_deny.so
+
+# Account — auto-create Linux user if authenticated but not in /etc/passwd
+# This handles Keycloak-only users who don't have a local account yet
+account required pam_exec.so /opt/pam-keycloak-oidc/ensure-user.sh
+account required pam_permit.so
+
+# Password — not used (Keycloak manages passwords)
+password required pam_deny.so
+
+# Session — create home dir on first login, minimal setup
+session required pam_mkhomedir.so skel=/etc/skel umask=0022
+session required pam_limits.so
+session required pam_permit.so

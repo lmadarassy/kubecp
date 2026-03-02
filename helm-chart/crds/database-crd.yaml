@@ -1,0 +1,104 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.1
+  name: databases.hosting.hosting.panel
+spec:
+  group: hosting.hosting.panel
+  names:
+    kind: Database
+    listKind: DatabaseList
+    plural: databases
+    singular: database
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.host
+      name: Host
+      type: string
+    - jsonPath: .status.databaseName
+      name: Database
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Database is the Schema for the databases API.
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              charset:
+                default: utf8mb4
+                type: string
+              collation:
+                default: utf8mb4_unicode_ci
+                type: string
+              name:
+                maxLength: 64
+                minLength: 1
+                pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+                type: string
+            required: [name]
+            type: object
+          status:
+            properties:
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      format: date-time
+                      type: string
+                    message:
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      maxLength: 1024
+                      minLength: 1
+                      type: string
+                    status:
+                      enum: ["True", "False", "Unknown"]
+                      type: string
+                    type:
+                      maxLength: 316
+                      type: string
+                  required: [lastTransitionTime, message, reason, status, type]
+                  type: object
+                type: array
+              databaseName:
+                type: string
+              host:
+                type: string
+              phase:
+                enum: [Pending, Creating, Ready, Error, Terminating]
+                type: string
+              port:
+                format: int32
+                type: integer
+              username:
+                type: string
+              password:
+                type: string
+            type: object
+        required: [spec]
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

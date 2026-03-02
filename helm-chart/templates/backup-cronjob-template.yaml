@@ -1,0 +1,99 @@
+{{- if .Values.backup.enabled }}
+# This is a template CronJob for per-user backups.
+# The Panel Core dynamically creates CronJobs per user based on this template.
+# This default CronJob serves as the system-level backup configuration reference.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-backup-system
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: backup
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: backup
+            app.kubernetes.io/instance: {{ .Release.Name }}
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
+              imagePullPolicy: {{ .Values.backup.image.pullPolicy }}
+              env:
+                - name: BACKUP_DESTINATION
+                  value: {{ .Values.backup.destination | quote }}
+                - name: BACKUP_RETENTION_COUNT
+                  value: {{ .Values.backup.retentionCount | quote }}
+                - name: GALERA_HOST
+                  value: {{ include "hosting-panel.galeraHost" . | quote }}
+                - name: GALERA_PORT
+                  value: "3306"
+                - name: GALERA_USER
+                  value: {{ .Values.mariadbGalera.db.user | quote }}
+                - name: GALERA_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "hosting-panel.fullname" . }}-db-credentials
+                      key: password
+                {{- if eq .Values.backup.destination "s3" }}
+                - name: S3_ENDPOINT
+                  value: {{ .Values.backup.s3.endpoint | quote }}
+                - name: S3_BUCKET
+                  value: {{ .Values.backup.s3.bucket | quote }}
+                - name: S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "hosting-panel.fullname" . }}-backup-s3
+                      key: access-key
+                - name: S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "hosting-panel.fullname" . }}-backup-s3
+                      key: secret-key
+                {{- end }}
+                {{- if eq .Values.backup.destination "sftp" }}
+                - name: SFTP_HOST
+                  value: {{ .Values.backup.sftpRemote.host | quote }}
+                - name: SFTP_PORT
+                  value: {{ .Values.backup.sftpRemote.port | quote }}
+                - name: SFTP_USERNAME
+                  value: {{ .Values.backup.sftpRemote.username | quote }}
+                {{- end }}
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: /backups
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: {{ include "hosting-panel.fullname" . }}-backup-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-backup-storage
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: backup-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.backup.storage.size }}
+{{- end }}

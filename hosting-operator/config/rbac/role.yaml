@@ -1,0 +1,66 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - hosting.hosting.panel
+  resources:
+  - databases
+  - emailaccounts
+  - sftpaccounts
+  - websites
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - hosting.hosting.panel
+  resources:
+  - databases/finalizers
+  - emailaccounts/finalizers
+  - sftpaccounts/finalizers
+  - websites/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - hosting.hosting.panel
+  resources:
+  - databases/status
+  - emailaccounts/status
+  - sftpaccounts/status
+  - websites/status
+  verbs:
+  - get
+  - patch
+  - update

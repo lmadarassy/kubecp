@@ -1,0 +1,75 @@
+{{- if .Values.mail.imap.enabled }}
+# =============================================================================
+# Dovecot — Configuration ConfigMap
+# Auth via Keycloak checkpassword (ROPC grant)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-dovecot-config
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: mail-imap
+    app.kubernetes.io/component: mail
+data:
+  dovecot.conf: |
+    protocols = imap pop3 lmtp
+    log_path = /dev/stderr
+    info_log_path = /dev/stdout
+
+    # Import container env vars so auth workers can access them
+    import_environment = KC_TOKEN_URL KC_CLIENT_ID KC_CLIENT_SECRET
+
+    # Mail location — Maildir format on shared PV
+    mail_location = maildir:/var/mail/vhosts/%d/%n/Maildir
+    mail_home = /var/mail/vhosts/%d/%n
+    mail_uid = 5000
+    mail_gid = 5000
+    first_valid_uid = 5000
+    last_valid_uid = 5000
+
+    namespace inbox {
+      inbox = yes
+      separator = /
+    }
+
+    # Authentication — Keycloak via checkpassword (passdb only)
+    passdb {
+      driver = checkpassword
+      args = /usr/local/bin/kc-checkpassword
+    }
+    # Prefetch userdb — uses info from checkpassword (after successful IMAP/POP3 login)
+    userdb {
+      driver = prefetch
+    }
+    # Static userdb — fallback for LMTP delivery and doveadm (no passdb auth needed)
+    userdb {
+      driver = static
+      args = uid=5000 gid=5000 home=/var/mail/vhosts/%d/%n mail=maildir:/var/mail/vhosts/%d/%n/Maildir
+    }
+
+    # Auth service for Postfix SASL
+    service auth {
+      inet_listener {
+        port = 12345
+      }
+    }
+
+    # LMTP for local mail delivery
+    service lmtp {
+      inet_listener lmtp {
+        port = 24
+      }
+    }
+
+    ssl = no
+
+    protocol imap {
+      mail_max_userip_connections = 20
+    }
+
+    protocol pop3 {
+      pop3_uidl_format = %08Xu%08Xv
+    }
+{{- end }}

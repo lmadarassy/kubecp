@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build artifacts
+*.tar
+*.tar.gz
+dist/
+bin/
+
+# Helm downloaded sub-charts (use `helm dependency build`)
+helm-chart/charts/*.tgz
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kiro
+.kiro/
+
+# Temp
+/tmp/
+*.log

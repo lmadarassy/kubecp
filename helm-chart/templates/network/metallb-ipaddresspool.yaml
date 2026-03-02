@@ -1,0 +1,30 @@
+{{/*
+  MetalLB IPAddressPool — only created in multi-ip mode when a loadBalancerIP is specified.
+  This creates a dedicated pool for the hosting platform's shared IP.
+*/}}
+{{- if and (eq .Values.global.networkMode "multi-ip") .Values.metallb.enabled .Values.global.loadBalancerIP }}
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: {{ .Values.metallb.ipAddressPool.name }}-dedicated
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network
+spec:
+  addresses:
+    - {{ .Values.global.loadBalancerIP }}/32
+  autoAssign: false
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: {{ .Values.metallb.l2Advertisement.name }}-dedicated
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/component: network
+spec:
+  ipAddressPools:
+    - {{ .Values.metallb.ipAddressPool.name }}-dedicated
+{{- end }}

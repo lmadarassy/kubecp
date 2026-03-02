@@ -1,0 +1,65 @@
+{{- if .Values.rspamd.enabled }}
+# =============================================================================
+# Rspamd — Configuration ConfigMap (Helm template → ConfigMap)
+# =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hosting-panel.fullname" . }}-rspamd-config
+  namespace: {{ include "hosting-panel.namespace" . }}
+  labels:
+    {{- include "hosting-panel.labels" . | nindent 4 }}
+    app.kubernetes.io/name: rspamd
+    app.kubernetes.io/component: mail
+data:
+  # Worker proxy — milter interface for Postfix
+  worker-proxy.inc: |
+    bind_socket = "*:{{ .Values.rspamd.service.milterPort }}";
+    milter = yes;
+    timeout = 120s;
+    upstream "local" {
+      default = yes;
+      self_scan = yes;
+    }
+
+  # Worker controller — web UI and API
+  worker-controller.inc: |
+    bind_socket = "*:{{ .Values.rspamd.service.webPort }}";
+    # Password for web UI (set empty for read-only)
+    password = "";
+
+  # Worker normal — scanning worker
+  worker-normal.inc: |
+    bind_socket = "localhost:11333";
+
+  # ClamAV integration — antivirus module
+  antivirus.conf: |
+    {{- if .Values.clamav.enabled }}
+    clamav {
+      action = "reject";
+      type = "clamav";
+      servers = "{{ include "hosting-panel.fullname" . }}-clamav:{{ .Values.clamav.service.port }}";
+      scan_mime_parts = true;
+      symbol = "CLAM_VIRUS";
+      patterns {
+        JUST_EICAR = "^Eicar-Test-Signature$";
+      }
+    }
+    {{- end }}
+
+  # DKIM signing — per-domain DKIM keys
+  dkim_signing.conf: |
+    allow_username_mismatch = true;
+    path = "/var/lib/rspamd/dkim/$domain.$selector.key";
+    selector = "hosting";
+    check_pubkey = true;
+
+  # Milter headers
+  milter_headers.conf: |
+    use = ["x-spamd-bar", "x-spam-flag", "authentication-results"];
+
+  # Logging
+  logging.inc: |
+    type = "console";
+    level = "info";
+{{- end }}
