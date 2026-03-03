@@ -65,6 +65,8 @@ spec:
               value: {{ .Values.global.nodeCount | quote }}
             - name: STORAGE_CLASS
               value: {{ .Values.global.storageClass | quote }}
+            - name: USER_VOLUME_MODE
+              value: {{ .Values.global.userVolumeMode | quote }}
           livenessProbe:
             httpGet:
               path: /healthz

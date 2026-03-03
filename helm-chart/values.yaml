@@ -8,8 +8,10 @@ global:
   hostname: "panel.example.com"
   # -- Number of cluster nodes: 1 (single-node) or 3 (HA)
   nodeCount: 3
-  # -- Default storage class (Longhorn)
+  # -- Default storage class for static PVCs (mariadb, postfix, clamav, etc.)
   storageClass: "longhorn"
+  # -- User volume mode: "pvc" (default, uses storageClass) or "hostpath" (direct hostPath mounts)
+  userVolumeMode: "pvc"
   # -- Storage class for databases (needs fsync — not suitable for FUSE-based storage)
   # -- Platform namespace for core components
   namespace: "hosting-system"

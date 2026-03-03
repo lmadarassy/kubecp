@@ -79,12 +79,8 @@ func SyncSFTPVolumes(ctx context.Context, c client.Client) error {
 	for _, username := range users {
 		volName := fmt.Sprintf("uv-%s", username)
 		userVolumes = append(userVolumes, corev1.Volume{
-			Name: volName,
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: UserVolumePVCName(username),
-				},
-			},
+			Name:         volName,
+			VolumeSource: userVolumeSource(username),
 		})
 		userMounts = append(userMounts, corev1.VolumeMount{
 			Name:      volName,

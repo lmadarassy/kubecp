@@ -250,8 +250,6 @@ func (r *WebsiteReconciler) desiredDeployment(website *hostingv1alpha1.Website) 
 
 	labels := websiteLabels(website)
 
-	// User_Volume PVC name: uv-{owner}
-	userVolumePVC := UserVolumePVCName(website.Spec.Owner)
 	// subPath for this website's webroot: web/{primaryDomain}
 	webrootSubPath := fmt.Sprintf("web/%s", website.Spec.PrimaryDomain)
 
@@ -338,12 +336,8 @@ exec apache2-foreground`, ownerUID, ownerUID, ownerUID, ownerUID),
 					},
 					Volumes: []corev1.Volume{
 						{
-							Name: "webroot",
-							VolumeSource: corev1.VolumeSource{
-								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-									ClaimName: userVolumePVC,
-								},
-							},
+							Name:         "webroot",
+							VolumeSource: userVolumeSource(website.Spec.Owner),
 						},
 						{
 							Name: "php-config",
@@ -670,6 +664,24 @@ func stringPtr(s string) *string {
 // boolPtr returns a pointer to the given bool.
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// userVolumeSource returns a hostPath or PVC volume source depending on mode.
+func userVolumeSource(username string) corev1.VolumeSource {
+	if IsHostPathMode() {
+		hostPathType := corev1.HostPathDirectoryOrCreate
+		return corev1.VolumeSource{
+			HostPath: &corev1.HostPathVolumeSource{
+				Path: UserVolumeHostPath(username),
+				Type: &hostPathType,
+			},
+		}
+	}
+	return corev1.VolumeSource{
+		PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			ClaimName: UserVolumePVCName(username),
+		},
+	}
 }
 
 // int64Ptr returns a pointer to the given int64.

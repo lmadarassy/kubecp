@@ -26,7 +26,21 @@ const (
 
 	// UserLabel is the label identifying the owning user
 	UserLabel = "hosting.panel/user"
+
+	// HostPathBase is the base directory for hostpath-mode user volumes
+	HostPathBase = "/data/kubecp"
 )
+
+// IsHostPathMode returns true when user volumes use direct hostPath mounts
+// instead of PVCs. Controlled by USER_VOLUME_MODE env var.
+func IsHostPathMode() bool {
+	return os.Getenv("USER_VOLUME_MODE") == "hostpath"
+}
+
+// UserVolumeHostPath returns the host directory for a user's volume.
+func UserVolumeHostPath(username string) string {
+	return fmt.Sprintf("%s/uv-%s", HostPathBase, username)
+}
 
 // UserVolumePVCName returns the PVC name for a given username.
 func UserVolumePVCName(username string) string {
@@ -38,6 +52,12 @@ func UserVolumePVCName(username string) string {
 // The PVC contains: /web/{domain}/ for websites and /mail/{domain}/{account}/ for email.
 func EnsureUserVolume(ctx context.Context, c client.Client, namespace, username string, storageGB int32) error {
 	logger := log.FromContext(ctx)
+
+	if IsHostPathMode() {
+		logger.V(1).Info("hostpath mode: skipping PVC creation", "user", username)
+		return nil
+	}
+
 	pvcName := UserVolumePVCName(username)
 
 	// Check if PVC already exists
@@ -97,6 +117,12 @@ func EnsureUserVolume(ctx context.Context, c client.Client, namespace, username 
 // Should only be called when the user is being fully removed.
 func DeleteUserVolume(ctx context.Context, c client.Client, namespace, username string) error {
 	logger := log.FromContext(ctx)
+
+	if IsHostPathMode() {
+		logger.Info("hostpath mode: skipping PVC deletion", "user", username)
+		return nil
+	}
+
 	pvcName := UserVolumePVCName(username)
 
 	pvc := &corev1.PersistentVolumeClaim{}
