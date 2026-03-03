@@ -55,6 +55,10 @@ panel:
   metrics:
     enabled: true
     port: 9090
+  # -- Keycloak admin credentials for user management
+  keycloakAdmin:
+    enabled: false
+    password: ""
 
 # =============================================================================
 # Hosting Operator
