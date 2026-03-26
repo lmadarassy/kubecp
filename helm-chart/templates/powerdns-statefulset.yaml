@@ -70,13 +70,9 @@ spec:
                   key: password
           {{- end }}
           livenessProbe:
-            httpGet:
-              path: /api/v1/servers/localhost
-              port: api
-              httpHeaders:
-                - name: X-API-Key
-                  value: {{ .Values.powerdns.api.key | quote }}
-            initialDelaySeconds: 30
+            tcpSocket:
+              port: dns-tcp
+            initialDelaySeconds: 15
             periodSeconds: 20
             failureThreshold: 5
           readinessProbe:

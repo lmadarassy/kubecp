@@ -245,6 +245,13 @@ spec:
                   \"protocol\":\"openid-connect\"
                 }" || true
 
+              # Disable unmanaged user profile attributes requirement (KC 26+)
+              echo "Disabling user profile validation..."
+              curl -sf -o /dev/null -X PUT "${KC_URL}/admin/realms/${REALM}" \
+                -H "Authorization: Bearer ${TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d '{"attributes":{"userProfileEnabled":"false"}}' || true
+
               # Set access token lifetime to 30 minutes (for long SFTP sessions, API calls)
               echo "Setting accessTokenLifespan to 1800s..."
               curl -sf -o /dev/null -X PUT "${KC_URL}/admin/realms/${REALM}" \
