@@ -49,8 +49,8 @@ spec:
         - name: powerdns
           image: "{{ .Values.powerdns.image.repository }}:{{ .Values.powerdns.image.tag }}"
           imagePullPolicy: {{ .Values.powerdns.image.pullPolicy }}
-          command: ["/usr/local/sbin/pdns_server"]
-          args: ["--config-dir=/etc/powerdns", "--guardian=no", "--daemon=no"]
+          command: ["sh", "-c"]
+          args: ["exec /usr/local/sbin/pdns_server --config-dir=/etc/powerdns --guardian=no --daemon=no --gmysql-password=${PDNS_GMYSQL_PASSWORD}"]
           ports:
             - name: dns-tcp
               containerPort: 53

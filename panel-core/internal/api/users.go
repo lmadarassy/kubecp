@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -230,7 +231,8 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create User_Volume PVC (uv-{username}) in hosting-system namespace
-	if h.k8sClient != nil {
+	// Skip in hostpath mode — the operator creates hostPath volumes directly
+	if h.k8sClient != nil && os.Getenv("USER_VOLUME_MODE") != "hostpath" {
 		storageGB := int32(10) // Default 10Gi, overridden by HostingPlan
 		pvcName := "uv-" + req.Username
 		storageClass := "longhorn"

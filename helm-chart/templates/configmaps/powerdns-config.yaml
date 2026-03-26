@@ -21,7 +21,6 @@ data:
     gmysql-port=3306
     gmysql-dbname=powerdns
     gmysql-user=powerdns
-    gmysql-password={{ default "" .Values.powerdns.db.password }}
     {{- else }}
     launch=gsqlite3
     gsqlite3-database=/data/pdns.sqlite3

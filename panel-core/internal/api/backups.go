@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -501,6 +502,23 @@ func buildRestoreJob(name, namespace, username, backupID string, target BackupTa
 	}
 }
 
+// userVolumeSpec returns a volume spec for user data — hostPath or PVC depending on USER_VOLUME_MODE.
+func userVolumeSpec(name, username string) map[string]interface{} {
+	if os.Getenv("USER_VOLUME_MODE") == "hostpath" {
+		return map[string]interface{}{
+			"name": name,
+			"hostPath": map[string]interface{}{
+				"path": "/data/kubecp/uv-" + username,
+				"type": "DirectoryOrCreate",
+			},
+		}
+	}
+	return map[string]interface{}{
+		"name":                   name,
+		"persistentVolumeClaim": map[string]interface{}{"claimName": "uv-" + username},
+	}
+}
+
 // backupPodSpec returns a shared pod spec for backup/restore jobs with volume mounts.
 func backupPodSpec(containerName, image, username string, env []interface{}) map[string]interface{} {
 	dbEnv := []interface{}{
@@ -532,10 +550,7 @@ func backupPodSpec(containerName, image, username string, env []interface{}) map
 			},
 		},
 		"volumes": []interface{}{
-			map[string]interface{}{
-				"name": "web-data",
-				"persistentVolumeClaim": map[string]interface{}{"claimName": "uv-" + username},
-			},
+			userVolumeSpec("web-data", username),
 			map[string]interface{}{
 				"name": "backups",
 				"persistentVolumeClaim": map[string]interface{}{"claimName": "hosting-backups"},
