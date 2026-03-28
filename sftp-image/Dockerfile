@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 RUN git clone --depth 1 https://github.com/zhaow-de/pam-keycloak-oidc.git .
+# Fix: handle empty xor-key gracefully (skip XOR instead of divide-by-zero)
+RUN sed -i '/^func encryptDecrypt/,/^}$/c\func encryptDecrypt(input []byte, key string) (output []byte) {\n\tkL := len(key)\n\tif kL == 0 {\n\t\treturn input\n\t}\n\tfor i := range input {\n\t\toutput = append(output, input[i]^key[i%kL])\n\t}\n\treturn output\n}' main.go
 RUN go build -o pam-keycloak-oidc .
 
 # --- Stage 2: Runtime image ---
