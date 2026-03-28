@@ -32,7 +32,7 @@ endpoint-auth-url = "${KEYCLOAK_URL:-http://keycloak:8080}/realms/${KEYCLOAK_REA
 endpoint-token-url = "${KEYCLOAK_URL:-http://keycloak:8080}/realms/${KEYCLOAK_REALM:-hosting}/protocol/openid-connect/token"
 username-format = "%s"
 vpn-user-role = "admin"
-xor-key = "sftp-hosting-panel-xor-key-2026"
+xor-key = "${XOR_KEY:-sftp-hosting-panel-xor-key-2026}"
 EOF
 echo "[sftp-init] pam-keycloak-oidc config written."
 
