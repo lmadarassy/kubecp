@@ -40,6 +40,8 @@ spec:
           env:
             - name: USER_VOLUME_MODE
               value: {{ .Values.global.userVolumeMode | quote }}
+            - name: BACKUP_IMAGE
+              value: "{{ .Values.backup.image.repository }}:{{ .Values.backup.image.tag }}"
             - name: PANEL_HOSTNAME
               value: {{ .Values.global.hostname | quote }}
             - name: KEYCLOAK_URL

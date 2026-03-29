@@ -445,7 +445,7 @@ func buildBackupJob(name, namespace, username string, target BackupTarget, compo
 							"hosting.panel/user": username,
 						},
 					},
-					"spec": backupPodSpec("backup", "panel-backup:latest", username, []interface{}{
+					"spec": backupPodSpec("backup", backupImage(), username, []interface{}{
 						map[string]interface{}{"name": "BACKUP_USER", "value": username},
 						map[string]interface{}{"name": "BACKUP_NAMESPACE", "value": namespace},
 						map[string]interface{}{"name": "BACKUP_TARGET", "value": string(targetJSON)},
@@ -489,7 +489,7 @@ func buildRestoreJob(name, namespace, username, backupID string, target BackupTa
 							"hosting.panel/backup": backupID,
 						},
 					},
-					"spec": backupPodSpec("restore", "panel-backup:latest", username, []interface{}{
+					"spec": backupPodSpec("restore", backupImage(), username, []interface{}{
 						map[string]interface{}{"name": "RESTORE_USER", "value": username},
 						map[string]interface{}{"name": "RESTORE_NAMESPACE", "value": namespace},
 						map[string]interface{}{"name": "RESTORE_BACKUP_ID", "value": backupID},
@@ -594,7 +594,7 @@ func buildBackupCronJob(name, namespace, username, schedule string, target Backu
 					"spec": map[string]interface{}{
 						"backoffLimit": int64(3),
 						"template": map[string]interface{}{
-							"spec": backupPodSpec("backup", "panel-backup:latest", username, []interface{}{
+							"spec": backupPodSpec("backup", backupImage(), username, []interface{}{
 								map[string]interface{}{"name": "BACKUP_USER", "value": username},
 								map[string]interface{}{"name": "BACKUP_NAMESPACE", "value": namespace},
 								map[string]interface{}{"name": "BACKUP_TARGET", "value": string(targetJSON)},
@@ -690,4 +690,11 @@ func cronJobToScheduleResponse(obj *unstructured.Unstructured) ScheduleResponse 
 	}
 
 	return resp
+}
+
+func backupImage() string {
+	if img := os.Getenv("BACKUP_IMAGE"); img != "" {
+		return img
+	}
+	return "panel-backup:latest"
 }
