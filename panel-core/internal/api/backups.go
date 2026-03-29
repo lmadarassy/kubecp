@@ -553,7 +553,7 @@ func backupPodSpec(containerName, image, username string, env []interface{}) map
 			userVolumeSpec("web-data", username),
 			map[string]interface{}{
 				"name": "backups",
-				"persistentVolumeClaim": map[string]interface{}{"claimName": "hosting-backups"},
+				"persistentVolumeClaim": map[string]interface{}{"claimName": "hosting-panel-backup-storage"},
 			},
 		},
 	}
