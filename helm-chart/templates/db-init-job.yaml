@@ -1,12 +1,9 @@
 {{- if .Values.mariadbGalera.enabled }}
-# Post-install job: create databases, users, and PowerDNS schema in MariaDB
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ include "hosting-panel.fullname" . }}-db-init
   namespace: {{ include "hosting-panel.namespace" . }}
-  labels:
-    {{- include "hosting-panel.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "5"
@@ -24,37 +21,19 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              set -e
               HOST="{{ include "hosting-panel.galeraHost" . }}"
-              echo "Waiting for MariaDB at ${HOST}..."
-              until mysql -h"${HOST}" -uroot -p"${MARIADB_ROOT_PASSWORD}" -e "SELECT 1" &>/dev/null; do
-                sleep 5
-              done
-              echo "MariaDB is ready."
-
-              mysql -h"${HOST}" -uroot -p"${MARIADB_ROOT_PASSWORD}" <<'SQL'
-              CREATE DATABASE IF NOT EXISTS powerdns;
-              CREATE DATABASE IF NOT EXISTS hosting;
-              GRANT ALL ON powerdns.* TO 'powerdns'@'%' IDENTIFIED BY '${PDNS_DB_PASSWORD}';
-              GRANT ALL ON hosting.* TO 'hosting'@'%' IDENTIFIED BY 'hostingpass123';
-              FLUSH PRIVILEGES;
-
-              USE powerdns;
-              CREATE TABLE IF NOT EXISTS domains (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, master VARCHAR(128), last_check INT, type VARCHAR(8) NOT NULL, notified_serial INT UNSIGNED, account VARCHAR(40), options TEXT, catalog VARCHAR(255), UNIQUE KEY name_index (name)) Engine=InnoDB;
-              CREATE TABLE IF NOT EXISTS records (id BIGINT AUTO_INCREMENT PRIMARY KEY, domain_id INT, name VARCHAR(255), type VARCHAR(10), content TEXT, ttl INT, prio INT, disabled TINYINT(1) DEFAULT 0, ordername VARCHAR(255) BINARY, auth TINYINT(1) DEFAULT 1, KEY nametype_index (name,type), KEY domain_id (domain_id), CONSTRAINT records_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;
-              CREATE TABLE IF NOT EXISTS supermasters (ip VARCHAR(64) NOT NULL, nameserver VARCHAR(255) NOT NULL, account VARCHAR(40) NOT NULL, PRIMARY KEY (ip, nameserver)) Engine=InnoDB;
-              CREATE TABLE IF NOT EXISTS comments (id INT AUTO_INCREMENT PRIMARY KEY, domain_id INT NOT NULL, name VARCHAR(255) NOT NULL, type VARCHAR(10) NOT NULL, modified_at INT NOT NULL, account VARCHAR(40) NOT NULL, comment TEXT NOT NULL, KEY comments_name_type_idx (name, type), KEY comments_order_idx (domain_id, modified_at), CONSTRAINT comments_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;
-              CREATE TABLE IF NOT EXISTS domainmetadata (id INT AUTO_INCREMENT PRIMARY KEY, domain_id INT NOT NULL, kind VARCHAR(32), content TEXT, KEY domainmetadata_idx (domain_id, kind), CONSTRAINT domainmetadata_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;
-              CREATE TABLE IF NOT EXISTS cryptokeys (id INT AUTO_INCREMENT PRIMARY KEY, domain_id INT NOT NULL, flags INT NOT NULL, active BOOL, published BOOL DEFAULT 1, content TEXT, KEY domainidindex (domain_id), CONSTRAINT cryptokeys_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;
-              CREATE TABLE IF NOT EXISTS tsigkeys (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), algorithm VARCHAR(50), secret VARCHAR(255), UNIQUE KEY namealgoindex (name, algorithm)) Engine=InnoDB;
-SQL
-              # Replace env vars in SQL (heredoc doesn't expand inside single quotes)
-              mysql -h"${HOST}" -uroot -p"${MARIADB_ROOT_PASSWORD}" -e "
-                CREATE USER IF NOT EXISTS 'powerdns'@'%' IDENTIFIED BY '${PDNS_DB_PASSWORD}';
-                ALTER USER 'powerdns'@'%' IDENTIFIED BY '${PDNS_DB_PASSWORD}';
-                GRANT ALL ON powerdns.* TO 'powerdns'@'%';
-                FLUSH PRIVILEGES;
-              "
+              echo "Waiting for MariaDB..."
+              until mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" -e "SELECT 1" &>/dev/null; do sleep 5; done
+              echo "MariaDB ready. Creating databases and schema..."
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS powerdns; CREATE DATABASE IF NOT EXISTS hosting;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" -e "CREATE USER IF NOT EXISTS 'powerdns'@'%' IDENTIFIED BY '$PDNS_DB_PASSWORD'; ALTER USER 'powerdns'@'%' IDENTIFIED BY '$PDNS_DB_PASSWORD'; GRANT ALL ON powerdns.* TO 'powerdns'@'%'; CREATE USER IF NOT EXISTS 'hosting'@'%' IDENTIFIED BY 'hostingpass123'; GRANT ALL ON hosting.* TO 'hosting'@'%'; FLUSH PRIVILEGES;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" powerdns -e "CREATE TABLE IF NOT EXISTS domains (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255) NOT NULL, master VARCHAR(128), last_check INT, type VARCHAR(8) NOT NULL, notified_serial INT UNSIGNED, account VARCHAR(40), options TEXT, catalog VARCHAR(255), UNIQUE KEY name_index (name)) Engine=InnoDB;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" powerdns -e "CREATE TABLE IF NOT EXISTS records (id BIGINT AUTO_INCREMENT PRIMARY KEY, domain_id INT, name VARCHAR(255), type VARCHAR(10), content TEXT, ttl INT, prio INT, disabled TINYINT(1) DEFAULT 0, ordername VARCHAR(255) BINARY, auth TINYINT(1) DEFAULT 1, KEY nametype_index (name,type), KEY domain_id (domain_id), CONSTRAINT records_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" powerdns -e "CREATE TABLE IF NOT EXISTS supermasters (ip VARCHAR(64) NOT NULL, nameserver VARCHAR(255) NOT NULL, account VARCHAR(40) NOT NULL, PRIMARY KEY (ip, nameserver)) Engine=InnoDB;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" powerdns -e "CREATE TABLE IF NOT EXISTS comments (id INT AUTO_INCREMENT PRIMARY KEY, domain_id INT NOT NULL, name VARCHAR(255) NOT NULL, type VARCHAR(10) NOT NULL, modified_at INT NOT NULL, account VARCHAR(40) NOT NULL, comment TEXT NOT NULL, KEY comments_name_type_idx (name, type), KEY comments_order_idx (domain_id, modified_at), CONSTRAINT comments_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" powerdns -e "CREATE TABLE IF NOT EXISTS domainmetadata (id INT AUTO_INCREMENT PRIMARY KEY, domain_id INT NOT NULL, kind VARCHAR(32), content TEXT, KEY domainmetadata_idx (domain_id, kind), CONSTRAINT domainmetadata_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" powerdns -e "CREATE TABLE IF NOT EXISTS cryptokeys (id INT AUTO_INCREMENT PRIMARY KEY, domain_id INT NOT NULL, flags INT NOT NULL, active BOOL, published BOOL DEFAULT 1, content TEXT, KEY domainidindex (domain_id), CONSTRAINT cryptokeys_ibfk_1 FOREIGN KEY (domain_id) REFERENCES domains (id) ON DELETE CASCADE) Engine=InnoDB;"
+              mysql -h"$HOST" -uroot -p"$MARIADB_ROOT_PASSWORD" powerdns -e "CREATE TABLE IF NOT EXISTS tsigkeys (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(255), algorithm VARCHAR(50), secret VARCHAR(255), UNIQUE KEY namealgoindex (name, algorithm)) Engine=InnoDB;"
               echo "DB init complete."
           env:
             - name: MARIADB_ROOT_PASSWORD
