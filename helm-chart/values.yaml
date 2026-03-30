@@ -368,11 +368,7 @@ keycloak:
       webOrigins:
         - "https://panel.example.com"
     ldapFederation:
-      enabled: true
-      connectionUrl: "ldap://localhost"
-      usersDn: "ou=users,dc=hosting,dc=panel"
-      bindDn: "cn=admin,dc=hosting,dc=panel"
-      bindCredential: ""
+      enabled: false
   postgresql:
     enabled: true
     auth:
