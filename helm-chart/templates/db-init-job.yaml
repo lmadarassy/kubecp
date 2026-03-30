@@ -19,7 +19,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: db-init
-          image: "{{ .Values.mariadbGalera.image.registry | default "docker.io" }}/{{ .Values.mariadbGalera.image.repository | default "bitnami/mariadb-galera" }}:{{ .Values.mariadbGalera.image.tag }}"
+          image: "docker.io/bitnami/mariadb-galera:{{ .Values.mariadbGalera.image.tag | default "latest" }}"
           imagePullPolicy: IfNotPresent
           command: ["/bin/bash", "-c"]
           args:
