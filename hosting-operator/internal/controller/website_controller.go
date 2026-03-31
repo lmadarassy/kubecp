@@ -54,14 +54,14 @@ import (
 
 const (
 	websiteFinalizer = "hosting.panel/website-cleanup"
-	phpImagePrefix   = getEnvOrDefault("PHP_IMAGE_PREFIX", "php")
+	phpImagePrefix   = "php"
 )
 
 // phpImageTag returns the container image for a given PHP version.
 // phpApacheImageTag returns the container image for a given PHP version (Apache variant).
 // Uses php:X.Y-apache which includes Apache + mod_php with .htaccess support.
 func phpApacheImageTag(version string) string {
-	return fmt.Sprintf("%s:%s-apache", phpImagePrefix, version)
+	prefix := phpImagePrefix; if v := os.Getenv("PHP_IMAGE_PREFIX"); v != "" { prefix = v }; return fmt.Sprintf("%s:%s-apache", prefix, version)
 }
 
 // WebsiteReconciler reconciles a Website object
