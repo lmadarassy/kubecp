@@ -29,7 +29,7 @@ spec:
         - name: dockerhub-creds
       initContainers:
         - name: fix-maildir-perms
-          image: busybox:1.36
+          image: ghcr.io/lmadarassy/kubecp/mirror/busybox:1.36
           command: ["sh", "-c", "chown -R 5000:5000 /var/mail/vhosts; chmod 755 /var/mail/vhosts"]
           volumeMounts:
             - name: mail-data
