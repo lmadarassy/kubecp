@@ -27,6 +27,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"os"
 	"math/big"
 	"net/http"
 	"strings"
@@ -53,7 +54,7 @@ import (
 
 const (
 	websiteFinalizer = "hosting.panel/website-cleanup"
-	phpImagePrefix   = "php"
+	phpImagePrefix   = getEnvOrDefault("PHP_IMAGE_PREFIX", "php")
 )
 
 // phpImageTag returns the container image for a given PHP version.
