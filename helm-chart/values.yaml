@@ -144,7 +144,7 @@ mail:
     enabled: true
     image:
       repository: ghcr.io/lmadarassy/kubecp/mirror/postfix
-      tag: "4.8"
+      tag: "latest"
       pullPolicy: IfNotPresent
     replicas: 1
     resources:
@@ -206,7 +206,7 @@ rspamd:
   enabled: true
   image:
     repository: ghcr.io/lmadarassy/kubecp/mirror/rspamd
-    tag: "3.11.2-alpine"
+    tag: "latest"
     pullPolicy: IfNotPresent
   replicas: 1
   resources:
