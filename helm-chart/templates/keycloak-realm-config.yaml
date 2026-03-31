@@ -28,7 +28,7 @@ spec:
         {{- end }}
       containers:
         - name: keycloak-setup
-          image: curlimages/curl:8.5.0
+          image: ghcr.io/lmadarassy/kubecp/mirror/curl:8.5.0
           command: ["/bin/sh", "-c"]
           args:
             - |
