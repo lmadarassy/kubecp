@@ -17,11 +17,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - src: docker.io/bitnami/mariadb-galera:12.0.2-debian-12-r0
+          - src: docker.io/bitnamilegacy/mariadb-galera:12.0.2-debian-12-r0
             dst: mariadb-galera:12.0.2
-          - src: docker.io/bitnami/postgresql:17.6.0-debian-12-r0
+          - src: docker.io/bitnami/postgresql:latest
             dst: postgresql:17.6.0
-          - src: docker.io/bitnami/keycloak:26.3.3-debian-12-r0
+          - src: docker.io/bitnamilegacy/keycloak:26.3.3-debian-12-r0
             dst: keycloak:26.3.3
           - src: docker.io/powerdns/pdns-auth-48:latest
             dst: pdns-auth:4.8
