@@ -142,9 +142,10 @@ ok "Helm install done"
 info "Waiting for MariaDB..."
 for i in $(seq 1 90); do
   sleep 5
-  kubectl exec hosting-panel-mariadb-galera-0 -n $NS -- mysql -uroot -p"${MARIADB_ROOT_PASS}" -e "SELECT 1" &>/dev/null && break
+  if kubectl exec hosting-panel-mariadb-galera-0 -n $NS -- mysql -uroot -p"${MARIADB_ROOT_PASS}" -e "SELECT 1" &>/dev/null; then
+    break
+  fi
 done
-sleep 5
 
 PDNS_DB_PASS=$(kubectl get secret hosting-panel-powerdns-db -n $NS -o jsonpath='{.data.password}' | base64 -d)
 
