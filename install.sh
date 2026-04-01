@@ -137,8 +137,9 @@ ok "Helm install done"
 
 # ── 6. Wait for MariaDB → init databases ─────────────────────────────────────
 info "Waiting for MariaDB..."
-for i in $(seq 1 60); do
-  kubectl get pod hosting-panel-mariadb-galera-0 -n $NS -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null | grep -q true && break; sleep 5
+for i in $(seq 1 90); do
+  kubectl exec hosting-panel-mariadb-galera-0 -n $NS -- mysql -uroot -p"${MARIADB_ROOT_PASS}" -e "SELECT 1" &>/dev/null && break
+  sleep 5
 done
 
 PDNS_DB_PASS=$(kubectl get secret hosting-panel-powerdns-db -n $NS -o jsonpath='{.data.password}' | base64 -d)
