@@ -12,12 +12,35 @@ env:
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/kubecp
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      panel-core: ${{ steps.filter.outputs.panel-core }}
+      panel-ui: ${{ steps.filter.outputs.panel-ui }}
+      hosting-operator: ${{ steps.filter.outputs.hosting-operator }}
+      panel-backup: ${{ steps.filter.outputs.panel-backup }}
+      sftp: ${{ steps.filter.outputs.sftp }}
+      chart: ${{ steps.filter.outputs.chart }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            panel-core: 'panel-core/**'
+            panel-ui: 'panel-ui/**'
+            hosting-operator: 'hosting-operator/**'
+            panel-backup: 'panel-backup/**'
+            sftp: 'sftp-image/**'
+            chart: 'helm-chart/**'
+
   build:
+    needs: changes
+    if: ${{ needs.changes.outputs[matrix.image.name] == 'true' || github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     strategy:
       matrix:
         image:
@@ -31,20 +54,15 @@ jobs:
             context: panel-backup
           - name: sftp
             context: sftp-image
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: docker/setup-qemu-action@v3
-
       - uses: docker/setup-buildx-action@v3
-
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - uses: docker/metadata-action@v5
         id: meta
         with:
@@ -53,7 +71,6 @@ jobs:
             type=raw,value={{date 'YYYYMMDD'}}-{{sha}},enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
-
       - uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.image.context }}
@@ -63,29 +80,19 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
   publish-chart:
+    needs: changes
+    if: ${{ needs.changes.outputs.chart == 'true' || github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Helm
-        uses: azure/setup-helm@v4
-
+      - uses: azure/setup-helm@v4
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Build dependencies
+      - name: Build dependencies and push chart
         run: |
-          cd helm-chart
-          helm dependency build
-
-      - name: Package and push chart
-        run: |
+          cd helm-chart && helm dependency build && cd ..
           helm package helm-chart
-          PKG=$(ls *.tgz)
-          helm push "$PKG" oci://ghcr.io/${{ github.repository_owner }}/kubecp/charts
-          echo "Pushed $PKG"
+          helm push $(ls *.tgz) oci://ghcr.io/${{ github.repository_owner }}/kubecp/charts
