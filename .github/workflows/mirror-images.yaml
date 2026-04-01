@@ -3,10 +3,9 @@ name: Mirror Third-Party Images
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 6 * * 1'  # Weekly Monday 6am
+    - cron: '0 6 * * 1'
 
 env:
-  REGISTRY: ghcr.io
   PREFIX: ghcr.io/${{ github.repository_owner }}/kubecp/mirror
 
 jobs:
@@ -15,6 +14,7 @@ jobs:
     permissions:
       packages: write
     strategy:
+      fail-fast: false
       matrix:
         include:
           - src: docker.io/bitnamilegacy/mariadb-galera:12.0.2-debian-12-r0
@@ -46,15 +46,16 @@ jobs:
           - src: docker.io/curlimages/curl:8.5.0
             dst: curl:8.5.0
     steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull, retag, push
+      - name: Install crane
         run: |
-          docker pull ${{ matrix.src }}
-          docker tag ${{ matrix.src }} ${{ env.PREFIX }}/${{ matrix.dst }}
-          docker push ${{ env.PREFIX }}/${{ matrix.dst }}
+          curl -sL https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz | tar xz crane
+          sudo mv crane /usr/local/bin/
+
+      - name: Copy image (all platforms)
+        run: crane copy ${{ matrix.src }} ${{ env.PREFIX }}/${{ matrix.dst }}
