@@ -65,6 +65,7 @@ EOF
 curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --disable=servicelb" sh -
 for i in $(seq 1 30); do /usr/local/bin/kubectl get nodes &>/dev/null && break; sleep 2; done
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+export PATH="/usr/local/bin:$PATH"
 ok "k3s ready ($(kubectl get nodes -o jsonpath='{.items[0].status.nodeInfo.kubeletVersion}'))"
 
 # ── 4. Contour ingress + cert-manager ────────────────────────────────────────
