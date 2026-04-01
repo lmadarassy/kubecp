@@ -96,7 +96,8 @@ ok "Contour ready (Envoy on ports 8080/8443)"
 # ── 5. Helm install ──────────────────────────────────────────────────────────
 kubectl create namespace $NS 2>/dev/null || true
 mkdir -p /data/kubecp && chmod 777 /data/kubecp
-command -v helm &>/dev/null || { curl -sfL https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz | tar xz -C /tmp; cp /tmp/linux-amd64/helm /usr/local/bin/; }
+ARCH=$(uname -m | sed "s/x86_64/amd64/;s/aarch64/arm64/")
+command -v helm &>/dev/null || { curl -sfL "https://get.helm.sh/helm-v3.17.3-linux-${ARCH}.tar.gz" | tar xz -C /tmp; cp /tmp/linux-${ARCH}/helm /usr/local/bin/; }
 
 CHART_DIR="${SCRIPT_DIR}/helm-chart"
 [[ ! -d "$CHART_DIR" && -f "${SCRIPT_DIR}/helm-chart.tar.gz" ]] && { cd /tmp; tar xzf "${SCRIPT_DIR}/helm-chart.tar.gz"; CHART_DIR="/tmp/helm-chart"; }
