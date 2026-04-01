@@ -58,4 +58,4 @@ jobs:
           sudo mv crane /usr/local/bin/
 
       - name: Copy image (all platforms)
-        run: crane copy ${{ matrix.src }} ${{ env.PREFIX }}/${{ matrix.dst }}
+        run: crane copy --platform all ${{ matrix.src }} ${{ env.PREFIX }}/${{ matrix.dst }}
