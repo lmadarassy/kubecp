@@ -140,12 +140,13 @@ ok "Helm install done"
 
 # ── 6. Wait for MariaDB → init databases ─────────────────────────────────────
 info "Waiting for MariaDB..."
+set +e
 for i in $(seq 1 90); do
   sleep 5
-  if kubectl exec hosting-panel-mariadb-galera-0 -n $NS -- mysql -uroot -p"${MARIADB_ROOT_PASS}" -e "SELECT 1" &>/dev/null; then
-    break
-  fi
+  kubectl exec hosting-panel-mariadb-galera-0 -n $NS -- mysql -uroot -p"${MARIADB_ROOT_PASS}" -e "SELECT 1" &>/dev/null
+  if [ $? -eq 0 ]; then break; fi
 done
+set -e
 
 PDNS_DB_PASS=$(kubectl get secret hosting-panel-powerdns-db -n $NS -o jsonpath='{.data.password}' | base64 -d)
 
@@ -171,9 +172,13 @@ ok "Databases initialized"
 
 # ── 7. Wait for Keycloak → configure realm ────────────────────────────────────
 info "Waiting for Keycloak (takes ~3 min on first start)..."
+set +e
 for i in $(seq 1 60); do
-  kubectl get pod hosting-panel-keycloak-0 -n $NS -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null | grep -q true && break; sleep 5
+  sleep 5
+  READY=$(kubectl get pod hosting-panel-keycloak-0 -n $NS -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null)
+  [ "$READY" = "true" ] && break
 done
+set -e
 
 KC_PASS=$(kubectl get secret hosting-panel-keycloak -n $NS -o jsonpath='{.data.admin-password}' | base64 -d)
 SFTP_SECRET=$(kubectl get secret hosting-panel-sftp-client -n $NS -o jsonpath='{.data.secret}' | base64 -d)
