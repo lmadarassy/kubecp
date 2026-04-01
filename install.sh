@@ -99,7 +99,7 @@ mkdir -p /data/kubecp && chmod 777 /data/kubecp
 ARCH=$(uname -m | sed "s/x86_64/amd64/;s/aarch64/arm64/")
 command -v helm &>/dev/null || { curl -sfL "https://get.helm.sh/helm-v3.17.3-linux-${ARCH}.tar.gz" | tar xz -C /tmp; cp /tmp/linux-${ARCH}/helm /usr/local/bin/; }
 
-CHART_REF="oci://ghcr.io/lmadarassy/kubecp/charts/kubecp"
+CHART_REF="oci://ghcr.io/lmadarassy/kubecp/charts/hosting-panel"
 # Use local chart if available, otherwise pull from GHCR
 if [[ -d "${SCRIPT_DIR}/helm-chart" ]]; then
   CHART_REF="${SCRIPT_DIR}/helm-chart"

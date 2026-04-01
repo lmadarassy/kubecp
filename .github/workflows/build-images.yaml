@@ -86,6 +86,6 @@ jobs:
       - name: Package and push chart
         run: |
           helm package helm-chart
-          PKG=$(ls kubecp-*.tgz)
+          PKG=$(ls *.tgz)
           helm push "$PKG" oci://ghcr.io/${{ github.repository_owner }}/kubecp/charts
           echo "Pushed $PKG"
