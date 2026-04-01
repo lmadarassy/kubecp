@@ -102,7 +102,7 @@ powerdns:
   api:
     enabled: true
     port: 8081
-    key: "test-pdns-api-key"
+    key: ""
   # -- Database credentials (gmysql backend)
   db:
     password: ""
