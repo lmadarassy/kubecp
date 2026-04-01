@@ -107,6 +107,12 @@ elif [[ -f "${SCRIPT_DIR}/helm-chart.tar.gz" ]]; then
   cd /tmp; tar xzf "${SCRIPT_DIR}/helm-chart.tar.gz"; CHART_REF="/tmp/helm-chart"
 fi
 
+# Build chart dependencies if using local chart directory
+if [[ -d "$CHART_REF" ]]; then
+  info "Building Helm chart dependencies..."
+  helm dependency build "$CHART_REF" 2>&1 | tail -3
+fi
+
 info "Installing hosting-panel via Helm..."
 helm install hosting-panel "$CHART_REF" \
   --namespace $NS --timeout 2m --no-hooks \
