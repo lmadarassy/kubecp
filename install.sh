@@ -99,11 +99,16 @@ mkdir -p /data/kubecp && chmod 777 /data/kubecp
 ARCH=$(uname -m | sed "s/x86_64/amd64/;s/aarch64/arm64/")
 command -v helm &>/dev/null || { curl -sfL "https://get.helm.sh/helm-v3.17.3-linux-${ARCH}.tar.gz" | tar xz -C /tmp; cp /tmp/linux-${ARCH}/helm /usr/local/bin/; }
 
-CHART_DIR="${SCRIPT_DIR}/helm-chart"
-[[ ! -d "$CHART_DIR" && -f "${SCRIPT_DIR}/helm-chart.tar.gz" ]] && { cd /tmp; tar xzf "${SCRIPT_DIR}/helm-chart.tar.gz"; CHART_DIR="/tmp/helm-chart"; }
+CHART_REF="oci://ghcr.io/lmadarassy/kubecp/charts/kubecp"
+# Use local chart if available, otherwise pull from GHCR
+if [[ -d "${SCRIPT_DIR}/helm-chart" ]]; then
+  CHART_REF="${SCRIPT_DIR}/helm-chart"
+elif [[ -f "${SCRIPT_DIR}/helm-chart.tar.gz" ]]; then
+  cd /tmp; tar xzf "${SCRIPT_DIR}/helm-chart.tar.gz"; CHART_REF="/tmp/helm-chart"
+fi
 
 info "Installing hosting-panel via Helm..."
-helm install hosting-panel "$CHART_DIR" \
+helm install hosting-panel "$CHART_REF" \
   --namespace $NS --timeout 2m --no-hooks \
   --set global.hostname="${FQDN}" --set global.externalIP="${IP}" \
   --set global.security.allowInsecureImages=true \
