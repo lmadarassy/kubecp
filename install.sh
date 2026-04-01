@@ -110,6 +110,9 @@ fi
 # Build chart dependencies if using local chart directory
 if [[ -d "$CHART_REF" ]]; then
   info "Building Helm chart dependencies..."
+  helm repo add bitnami https://charts.bitnami.com/bitnami 2>/dev/null || true
+  helm repo add jetstack https://charts.jetstack.io 2>/dev/null || true
+  helm repo add longhorn https://charts.longhorn.io 2>/dev/null || true
   helm dependency build "$CHART_REF" 2>&1 | tail -3
 fi
 
