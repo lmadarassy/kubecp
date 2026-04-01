@@ -140,11 +140,13 @@ ok "Helm install done"
 
 # ── 6. Wait for MariaDB → init databases ─────────────────────────────────────
 info "Waiting for MariaDB..."
+kubectl wait --for=condition=ready pod/hosting-panel-mariadb-galera-0 -n $NS --timeout=300s 2>/dev/null || true
+# Extra wait for mysql to accept connections
 set +e
-for i in $(seq 1 90); do
-  sleep 5
-  kubectl exec hosting-panel-mariadb-galera-0 -n $NS -- mysql -uroot -p"${MARIADB_ROOT_PASS}" -e "SELECT 1" &>/dev/null
-  if [ $? -eq 0 ]; then break; fi
+for i in $(seq 1 30); do
+  kubectl exec hosting-panel-mariadb-galera-0 -n $NS -- mysql -uroot -p"${MARIADB_ROOT_PASS}" -e "SELECT 1" &>/dev/null && break
+  info "  MariaDB not ready yet, retrying ($i/30)..."
+  sleep 10
 done
 set -e
 
