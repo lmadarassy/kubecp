@@ -65,6 +65,8 @@ spec:
               value: {{ .Values.global.nodeCount | quote }}
             - name: STORAGE_CLASS
               value: {{ .Values.global.storageClass | quote }}
+            - name: PANEL_HOSTNAME
+              value: {{ .Values.global.hostname | quote }}
             - name: PHP_IMAGE_PREFIX
               value: "{{ .Values.global.phpImagePrefix | default "php" }}"
             - name: USER_VOLUME_MODE

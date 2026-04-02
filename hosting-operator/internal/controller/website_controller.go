@@ -95,6 +95,19 @@ func (r *WebsiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// Reject websites that conflict with the admin panel FQDN
+	panelHostname := os.Getenv("PANEL_HOSTNAME")
+	if panelHostname != "" && (website.Spec.PrimaryDomain == panelHostname ||
+		website.Spec.PrimaryDomain == "keycloak."+panelHostname ||
+		website.Spec.PrimaryDomain == "webmail."+panelHostname ||
+		website.Spec.PrimaryDomain == "phpmyadmin."+panelHostname) {
+		log.Info("Rejected website: domain conflicts with admin panel", "domain", website.Spec.PrimaryDomain)
+		website.Status.Phase = "Failed"
+		website.Status.Message = "Domain conflicts with admin panel hostname"
+		_ = r.Status().Update(ctx, website)
+		return ctrl.Result{}, nil
+	}
+
 	// Handle deletion with finalizer
 	if !website.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, website)
