@@ -80,9 +80,10 @@ python3 -c "
 import yaml
 with open('/tmp/envoy-ds.yaml') as f: ds = yaml.safe_load(f)
 s = ds['spec']['template']['spec']
+s['hostNetwork'] = True; s['dnsPolicy'] = 'ClusterFirstWithHostNet'
 for c in s['containers']:
     if c['name'] == 'envoy':
-        c['ports'] = [{'name':'http','containerPort':8080,'hostPort':80,'protocol':'TCP'},{'name':'https','containerPort':8443,'hostPort':443,'protocol':'TCP'},{'name':'metrics','containerPort':8002,'protocol':'TCP'}]
+        c['ports'] = [{'name':'http','containerPort':8080,'protocol':'TCP'},{'name':'https','containerPort':8443,'protocol':'TCP'},{'name':'metrics','containerPort':8002,'protocol':'TCP'}]
 for k in ['resourceVersion','uid','creationTimestamp','generation']: ds['metadata'].pop(k,None)
 ds['metadata'].get('annotations',{}).pop('kubectl.kubernetes.io/last-applied-configuration',None)
 ds.pop('status',None)
@@ -90,7 +91,17 @@ with open('/tmp/envoy-fixed.yaml','w') as f: yaml.dump(ds,f,default_flow_style=F
 "
 kubectl delete ds envoy -n projectcontour 2>/dev/null
 kubectl apply -f /tmp/envoy-fixed.yaml 2>&1 | tail -1
-ok "Contour ready (Envoy on ports 80/443)"
+# Forward standard ports to Envoy (so user websites work on 80/443)
+if command -v nft &>/dev/null; then
+  nft add table ip nat 2>/dev/null || true
+  nft add chain ip nat prerouting '{ type nat hook prerouting priority -100; }' 2>/dev/null || true
+  nft add rule ip nat prerouting tcp dport 80 redirect to :8080 2>/dev/null || true
+  nft add rule ip nat prerouting tcp dport 443 redirect to :8443 2>/dev/null || true
+elif command -v iptables &>/dev/null; then
+  iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080 2>/dev/null || true
+  iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8443 2>/dev/null || true
+fi
+ok "Contour ready (admin: 8080/8443, websites: 80/443)"
 
 # ── 5. Helm install ──────────────────────────────────────────────────────────
 kubectl create namespace $NS 2>/dev/null || true
@@ -262,8 +273,8 @@ echo "============================================================"
 echo -e "\033[1;32m  ✓ KubeCP installed successfully!\033[0m"
 echo "============================================================"
 echo ""
-echo "  Panel URL:      http://${FQDN}"
-echo "  Keycloak URL:   http://keycloak.${FQDN}"
+echo "  Panel URL:      http://${FQDN}:8080"
+echo "  Keycloak URL:   http://keycloak.${FQDN}:8080"
 echo ""
 echo "  ── Credentials (save these!) ──"
 echo "  Keycloak admin:     admin / ${KC_PASS}"
