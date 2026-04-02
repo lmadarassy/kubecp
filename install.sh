@@ -80,10 +80,9 @@ python3 -c "
 import yaml
 with open('/tmp/envoy-ds.yaml') as f: ds = yaml.safe_load(f)
 s = ds['spec']['template']['spec']
-s['hostNetwork'] = True; s['dnsPolicy'] = 'ClusterFirstWithHostNet'
 for c in s['containers']:
     if c['name'] == 'envoy':
-        c['ports'] = [{'name':'http','containerPort':8080,'protocol':'TCP'},{'name':'https','containerPort':8443,'protocol':'TCP'},{'name':'metrics','containerPort':8002,'protocol':'TCP'}]
+        c['ports'] = [{'name':'http','containerPort':8080,'hostPort':80,'protocol':'TCP'},{'name':'https','containerPort':8443,'hostPort':443,'protocol':'TCP'},{'name':'metrics','containerPort':8002,'protocol':'TCP'}]
 for k in ['resourceVersion','uid','creationTimestamp','generation']: ds['metadata'].pop(k,None)
 ds['metadata'].get('annotations',{}).pop('kubectl.kubernetes.io/last-applied-configuration',None)
 ds.pop('status',None)
@@ -91,7 +90,7 @@ with open('/tmp/envoy-fixed.yaml','w') as f: yaml.dump(ds,f,default_flow_style=F
 "
 kubectl delete ds envoy -n projectcontour 2>/dev/null
 kubectl apply -f /tmp/envoy-fixed.yaml 2>&1 | tail -1
-ok "Contour ready (Envoy on ports 8080/8443)"
+ok "Contour ready (Envoy on ports 80/443)"
 
 # ── 5. Helm install ──────────────────────────────────────────────────────────
 kubectl create namespace $NS 2>/dev/null || true
@@ -263,8 +262,8 @@ echo "============================================================"
 echo -e "\033[1;32m  ✓ KubeCP installed successfully!\033[0m"
 echo "============================================================"
 echo ""
-echo "  Panel URL:      http://${FQDN}:8080"
-echo "  Keycloak URL:   http://keycloak.${FQDN}:8080"
+echo "  Panel URL:      http://${FQDN}"
+echo "  Keycloak URL:   http://keycloak.${FQDN}"
 echo ""
 echo "  ── Credentials (save these!) ──"
 echo "  Keycloak admin:     admin / ${KC_PASS}"
