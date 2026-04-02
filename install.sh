@@ -141,8 +141,11 @@ helm install hosting-panel "$CHART_REF" \
   --set keycloak.image.registry=ghcr.io --set keycloak.image.repository=lmadarassy/kubecp/mirror/keycloak --set keycloak.image.tag=26.3.3 \
   --set keycloak.postgresql.image.registry=ghcr.io --set keycloak.postgresql.image.repository=lmadarassy/kubecp/mirror/postgresql --set keycloak.postgresql.image.tag=latest \
   --set powerdns.api.key="${PDNS_API_KEY}" \
+  --set certManager.enabled=true \
+  --set certManager.clusterIssuers.email="admin@${FQDN}" \
+  --set certManager.clusterIssuers.production.enabled=true \
   --set metallb.enabled=false --set monitoring.enabled=false --set contour.enabled=false \
-  --set longhorn.enabled=false --set certManager.enabled=false \
+  --set longhorn.enabled=false \
   --set phpmyadmin.enabled=false --set clamav.enabled=false \
   2>&1 | tail -3
 kubectl scale statefulset hosting-panel-mariadb-galera -n $NS --replicas=1 2>/dev/null || true
@@ -273,7 +276,7 @@ echo "============================================================"
 echo -e "\033[1;32m  ✓ KubeCP installed successfully!\033[0m"
 echo "============================================================"
 echo ""
-echo "  Panel URL:      http://${FQDN}:8080"
+echo "  Panel URL:      https://${FQDN}:8443 (or http://${FQDN}:8080)"
 echo "  Keycloak URL:   http://keycloak.${FQDN}:8080"
 echo ""
 echo "  ── Credentials (save these!) ──"
